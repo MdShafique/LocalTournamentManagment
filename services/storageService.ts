@@ -1,9 +1,22 @@
+
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  onSnapshot 
+} from "firebase/firestore";
+import { db } from './firebase';
 import { Tournament, Team, Match, MatchStatus, Player } from '../types';
 
-// Using LocalStorage instead of Firestore due to missing firebase dependencies.
-const TOURNAMENTS_KEY = 'cric_tournaments';
-const TEAMS_KEY = 'cric_teams';
-const MATCHES_KEY = 'cric_matches';
+// Collections
+const TOURNAMENTS_COL = 'tournaments';
+const TEAMS_COL = 'teams';
+const MATCHES_COL = 'matches';
 
 // --- HELPERS ---
 
@@ -21,22 +34,7 @@ export const ballsFromOvers = (overs: number): number => {
     return (overPart * 6) + ballPart;
 }
 
-// Internal LocalStorage Helpers
-const getStored = <T>(key: string): T[] => {
-    try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : [];
-    } catch (e) {
-        console.error(`Error reading ${key}`, e);
-        return [];
-    }
-};
-
-const setStored = (key: string, data: any[]) => {
-    localStorage.setItem(key, JSON.stringify(data));
-};
-
-// Data Repair Helper
+// Data Repair Helper (Ensure structure exists)
 const repairMatchData = (match: Match): Match => {
     const updated = { ...match };
     if (!updated.scorecard) {
@@ -54,60 +52,49 @@ const repairMatchData = (match: Match): Match => {
 // --- TOURNAMENT METHODS ---
 
 export const getTournaments = async (): Promise<Tournament[]> => {
-    return getStored<Tournament>(TOURNAMENTS_KEY);
+    const snapshot = await getDocs(collection(db, TOURNAMENTS_COL));
+    return snapshot.docs.map(d => d.data() as Tournament);
 };
 
+// FETCH ONLY ADMIN'S TOURNAMENTS
 export const getTournamentsByAdmin = async (adminId: string): Promise<Tournament[]> => {
-    const all = getStored<Tournament>(TOURNAMENTS_KEY);
-    return all.filter(t => t.adminId === adminId);
+    const q = query(collection(db, TOURNAMENTS_COL), where("adminId", "==", adminId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.data() as Tournament);
 };
 
 export const getTournament = async (id: string): Promise<Tournament | undefined> => {
-    const all = getStored<Tournament>(TOURNAMENTS_KEY);
-    return all.find(t => t.id === id);
+    const snap = await getDoc(doc(db, TOURNAMENTS_COL, id));
+    return snap.exists() ? (snap.data() as Tournament) : undefined;
 };
 
 export const saveTournament = async (tournament: Tournament) => {
-    const all = getStored<Tournament>(TOURNAMENTS_KEY);
-    const index = all.findIndex(t => t.id === tournament.id);
-    if (index >= 0) {
-        all[index] = tournament;
-    } else {
-        all.push(tournament);
-    }
-    setStored(TOURNAMENTS_KEY, all);
+    await setDoc(doc(db, TOURNAMENTS_COL, tournament.id), tournament);
 };
 
 // --- TEAM METHODS ---
 
 export const getTeams = async (tournamentId: string): Promise<Team[]> => {
-    const all = getStored<Team>(TEAMS_KEY);
-    return all.filter(t => t.tournamentId === tournamentId);
+    const q = query(collection(db, TEAMS_COL), where("tournamentId", "==", tournamentId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.data() as Team);
 };
 
 export const saveTeam = async (team: Team) => {
-    const all = getStored<Team>(TEAMS_KEY);
-    const index = all.findIndex(t => t.id === team.id);
-    if (index >= 0) {
-        all[index] = team;
-    } else {
-        all.push(team);
-    }
-    setStored(TEAMS_KEY, all);
+    await setDoc(doc(db, TEAMS_COL, team.id), team);
 };
 
 export const deleteTeam = async (id: string) => {
-    const all = getStored<Team>(TEAMS_KEY);
-    const filtered = all.filter(t => t.id !== id);
-    setStored(TEAMS_KEY, filtered);
+    await deleteDoc(doc(db, TEAMS_COL, id));
 };
 
 // Player Management
 export const addPlayerToTeam = async (teamId: string, name: string, role: Player['role']) => {
-    const all = getStored<Team>(TEAMS_KEY);
-    const index = all.findIndex(t => t.id === teamId);
-    if (index >= 0) {
-        const team = all[index];
+    const teamRef = doc(db, TEAMS_COL, teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (teamSnap.exists()) {
+        const team = teamSnap.data() as Team;
         const newPlayer: Player = {
             id: Date.now().toString() + Math.random().toString().slice(2,5),
             name,
@@ -115,21 +102,20 @@ export const addPlayerToTeam = async (teamId: string, name: string, role: Player
             totalRuns: 0,
             totalWickets: 0
         };
-        team.players = team.players ? [...team.players, newPlayer] : [newPlayer];
-        all[index] = team;
-        setStored(TEAMS_KEY, all);
+        const updatedPlayers = team.players ? [...team.players, newPlayer] : [newPlayer];
+        await setDoc(teamRef, { ...team, players: updatedPlayers });
     }
 };
 
 export const deletePlayerFromTeam = async (teamId: string, playerId: string) => {
-    const all = getStored<Team>(TEAMS_KEY);
-    const index = all.findIndex(t => t.id === teamId);
-    if (index >= 0) {
-        const team = all[index];
+    const teamRef = doc(db, TEAMS_COL, teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (teamSnap.exists()) {
+        const team = teamSnap.data() as Team;
         if (team.players) {
-            team.players = team.players.filter(p => p.id !== playerId);
-            all[index] = team;
-            setStored(TEAMS_KEY, all);
+            const updatedPlayers = team.players.filter(p => p.id !== playerId);
+            await setDoc(teamRef, { ...team, players: updatedPlayers });
         }
     }
 };
@@ -137,38 +123,31 @@ export const deletePlayerFromTeam = async (teamId: string, playerId: string) => 
 // --- MATCH METHODS ---
 
 export const getMatches = async (tournamentId: string): Promise<Match[]> => {
-    const all = getStored<Match>(MATCHES_KEY);
-    return all.filter(m => m.tournamentId === tournamentId).map(repairMatchData);
+    const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => repairMatchData(d.data() as Match));
 };
 
-// REAL-TIME LISTENER (Polled for LocalStorage)
+// REAL-TIME LISTENER (FIRESTORE)
 export const subscribeToMatches = (tournamentId: string, callback: (matches: Match[]) => void) => {
-    const fetch = () => {
-        const all = getStored<Match>(MATCHES_KEY);
-        const matches = all.filter(m => m.tournamentId === tournamentId).map(repairMatchData);
-        callback(matches);
-    };
+    const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
     
-    fetch(); // Initial
-    const interval = setInterval(fetch, 2000); // Poll every 2 seconds
-    return () => clearInterval(interval);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const matches = snapshot.docs.map(d => repairMatchData(d.data() as Match));
+        callback(matches);
+    }, (error) => {
+        console.error("Error subscribing to matches:", error);
+    });
+
+    return unsubscribe;
 };
 
 export const saveMatch = async (match: Match) => {
-    const all = getStored<Match>(MATCHES_KEY);
-    const index = all.findIndex(m => m.id === match.id);
-    if (index >= 0) {
-        all[index] = match;
-    } else {
-        all.push(match);
-    }
-    setStored(MATCHES_KEY, all);
+    await setDoc(doc(db, MATCHES_COL, match.id), match);
 };
 
 export const deleteMatch = async (id: string) => {
-    const all = getStored<Match>(MATCHES_KEY);
-    const filtered = all.filter(m => m.id !== id);
-    setStored(MATCHES_KEY, filtered);
+    await deleteDoc(doc(db, MATCHES_COL, id));
 };
 
 export const initializeMatch = (

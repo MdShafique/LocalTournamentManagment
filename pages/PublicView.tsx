@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getTeams, getTournament, subscribeToMatches } from '../services/storageService';
@@ -6,7 +7,7 @@ import { Match, Team, Tournament, TableRow, MatchStatus } from '../types';
 import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
-import { Trophy, Activity, Calendar as CalIcon, BarChart3, Shield, Loader2 } from 'lucide-react';
+import { Trophy, Activity, Calendar as CalIcon, BarChart3, Shield, Loader2, AlertCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
 export const PublicView: React.FC = () => {
@@ -17,6 +18,7 @@ export const PublicView: React.FC = () => {
   const [table, setTable] = useState<TableRow[]>([]);
   const [activeTab, setActiveTab] = useState<'matches' | 'table' | 'squads' | 'stats'>('matches');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   
   // Modal State
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -24,11 +26,21 @@ export const PublicView: React.FC = () => {
   // Initial Load (Teams & Tournament Info)
   useEffect(() => {
     const loadStaticData = async () => {
-        if (id) {
+        if (!id) return;
+        try {
             const t = await getTournament(id);
+            if (!t) {
+                setError("Tournament not found. Please check the URL.");
+                setLoading(false);
+                return;
+            }
             const tm = await getTeams(id);
             setTournament(t);
             setTeams(tm);
+            // Don't set loading false here, wait for match subscription
+        } catch (e) {
+            console.error(e);
+            setError("Failed to load tournament data.");
             setLoading(false);
         }
     };
@@ -39,33 +51,51 @@ export const PublicView: React.FC = () => {
   useEffect(() => {
       if (!id) return;
 
-      // Subscribe to real-time updates
       const unsubscribe = subscribeToMatches(id, (updatedMatches) => {
           setMatches(updatedMatches);
+          setLoading(false); // Data received
           
-          // Re-calculate table whenever matches update
           if (teams.length > 0) {
              setTable(calculateTable(teams, updatedMatches));
           }
 
-          // If a modal is open, update its data live!
           if (selectedMatch) {
               const current = updatedMatches.find(m => m.id === selectedMatch.id);
               if (current) setSelectedMatch(current);
           }
       });
 
-      // Cleanup listener on unmount
       return () => unsubscribe();
   }, [id, teams.length, selectedMatch?.id]); 
 
-  if (loading || !tournament) return <Layout><div className="flex justify-center mt-20"><Loader2 className="animate-spin text-emerald-600" size={40}/></div></Layout>;
+  if (error) {
+      return (
+          <Layout>
+              <div className="flex flex-col items-center justify-center pt-20 text-slate-500">
+                  <AlertCircle size={48} className="text-red-400 mb-4"/>
+                  <h2 className="text-xl font-bold text-slate-800">Oops!</h2>
+                  <p>{error}</p>
+              </div>
+          </Layout>
+      );
+  }
+
+  if (loading || !tournament) {
+      return (
+        <Layout>
+            <div className="flex flex-col items-center justify-center mt-20 gap-3">
+                <Loader2 className="animate-spin text-emerald-600" size={40}/>
+                <p className="text-slate-500 animate-pulse">Loading Live Scores...</p>
+            </div>
+        </Layout>
+      );
+  }
 
   const liveMatches = matches.filter(m => m.status === MatchStatus.LIVE);
   const upcomingMatches = matches.filter(m => m.status === MatchStatus.SCHEDULED).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const completedMatches = matches.filter(m => m.status === MatchStatus.COMPLETED).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Aggregate stats from scorecards
+  // Aggregate stats logic (same as before)
   const getAllBattingStats = () => {
       const stats: Record<string, {name: string, runs: number, team: string}> = {};
       matches.forEach(m => {
@@ -186,6 +216,7 @@ export const PublicView: React.FC = () => {
           </div>
       )}
 
+      {/* Other tabs remain the same logically, just wrapped in conditionals */}
       {activeTab === 'table' && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in-up">
               <div className="overflow-x-auto">
@@ -219,6 +250,7 @@ export const PublicView: React.FC = () => {
                                 <td className="px-6 py-4 text-center font-bold text-slate-900">{row.points}</td>
                             </tr>
                         )})}
+                        {table.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-slate-400">No match data available to calculate table.</td></tr>}
                     </tbody>
                 </table>
               </div>

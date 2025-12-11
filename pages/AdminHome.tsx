@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTournamentsByAdmin, saveTournament } from '../services/storageService';
 import { auth, googleProvider, signInWithPopup, onAuthStateChanged, User, signOut } from '../services/firebase';
 import { Tournament } from '../types';
 import { Layout } from '../components/Layout';
-import { Plus, ChevronRight, LogOut, Loader2, User as UserIcon } from 'lucide-react';
+import { Plus, ChevronRight, LogOut, Loader2, User as UserIcon, AlertTriangle } from 'lucide-react';
 
 export const AdminHome: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -12,11 +13,15 @@ export const AdminHome: React.FC = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [newTourneyName, setNewTourneyName] = useState('');
+  
+  // Auth Error State
+  const [authError, setAuthError] = useState('');
+
   const navigate = useNavigate();
 
   // Listen for Auth State
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
         setUser(currentUser);
         if (currentUser) {
             loadTournaments(currentUser.uid);
@@ -30,18 +35,26 @@ export const AdminHome: React.FC = () => {
 
   const loadTournaments = async (uid: string) => {
       setIsLoading(true);
-      // Only fetch tournaments belonging to this user
-      const data = await getTournamentsByAdmin(uid);
-      setTournaments(data);
+      try {
+          const data = await getTournamentsByAdmin(uid);
+          setTournaments(data);
+      } catch (error) {
+          console.error("Error loading tournaments:", error);
+      }
       setIsLoading(false);
   };
 
   const handleLogin = async () => {
+      setAuthError('');
       try {
           await signInWithPopup(auth, googleProvider);
-      } catch (error) {
+      } catch (error: any) {
           console.error("Login Failed", error);
-          alert("Login failed. Please try again.");
+          if (error.code === 'auth/popup-closed-by-user') {
+             setAuthError("Login cancelled by user.");
+          } else {
+             setAuthError(error.message || "Login failed. Please check your internet connection.");
+          }
       }
   };
   
@@ -59,7 +72,7 @@ export const AdminHome: React.FC = () => {
           name: newTourneyName,
           startDate: new Date().toISOString(),
           endDate: new Date().toISOString(),
-          adminId: user.uid // Link tournament to Real Google User ID
+          adminId: user.uid
       };
       await saveTournament(newT);
       await loadTournaments(user.uid);
@@ -72,28 +85,43 @@ export const AdminHome: React.FC = () => {
        return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="animate-spin text-emerald-600" size={40}/></div>;
   }
 
+  // LOGIN SCREEN
   if (!user) {
       return (
           <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-                  <h1 className="text-3xl font-bold text-slate-900 mb-2">CricManage Pro</h1>
-                  <p className="text-slate-500 mb-8">Admin Portal Access</p>
+              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
+                  <div className="text-center mb-6">
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">CricManage Pro</h1>
+                    <p className="text-slate-500">Admin Portal Access</p>
+                  </div>
                   
+                  {authError && (
+                      <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4 text-left border border-red-200 flex gap-2">
+                          <AlertTriangle size={16} className="shrink-0 mt-0.5"/> 
+                          <div>
+                              <p className="font-bold">Connection Failed</p>
+                              <p>{authError}</p>
+                          </div>
+                      </div>
+                  )}
+
                   <button 
-                    onClick={handleLogin}
-                    className="w-full bg-white border border-slate-300 text-slate-700 py-3 rounded-lg hover:bg-slate-50 font-medium flex items-center justify-center gap-3 transition-colors shadow-sm"
+                      onClick={handleLogin}
+                      className="w-full bg-white border border-slate-300 text-slate-700 py-3 rounded-lg hover:bg-slate-50 font-medium flex items-center justify-center gap-3 transition-colors shadow-sm mb-4"
                   >
                       <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                       Sign in with Google
                   </button>
-                  <div className="mt-6 text-xs text-slate-400">
-                      Login securely with your Gmail account to manage your tournaments.
+                  
+                  <div className="text-center text-xs text-slate-400 mt-4">
+                      Create and manage your local tournaments easily.
                   </div>
               </div>
           </div>
       );
   }
 
+  // DASHBOARD
   return (
     <Layout>
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
