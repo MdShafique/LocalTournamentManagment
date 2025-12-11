@@ -1,21 +1,9 @@
 import { Tournament, Team, Match, MatchStatus, Player } from '../types';
-import { db } from './firebase';
-import { 
-    collection, 
-    getDocs, 
-    doc, 
-    setDoc, 
-    getDoc, 
-    deleteDoc, 
-    query, 
-    where,
-    onSnapshot
-} from 'firebase/firestore';
 
-// Collection Names
-const TOURNAMENTS_COL = 'tournaments';
-const TEAMS_COL = 'teams';
-const MATCHES_COL = 'matches';
+// Using LocalStorage instead of Firestore due to missing firebase dependencies.
+const TOURNAMENTS_KEY = 'cric_tournaments';
+const TEAMS_KEY = 'cric_teams';
+const MATCHES_KEY = 'cric_matches';
 
 // --- HELPERS ---
 
@@ -33,7 +21,22 @@ export const ballsFromOvers = (overs: number): number => {
     return (overPart * 6) + ballPart;
 }
 
-// Data Repair Helper (Kept from previous version)
+// Internal LocalStorage Helpers
+const getStored = <T>(key: string): T[] => {
+    try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : [];
+    } catch (e) {
+        console.error(`Error reading ${key}`, e);
+        return [];
+    }
+};
+
+const setStored = (key: string, data: any[]) => {
+    localStorage.setItem(key, JSON.stringify(data));
+};
+
+// Data Repair Helper
 const repairMatchData = (match: Match): Match => {
     const updated = { ...match };
     if (!updated.scorecard) {
@@ -51,61 +54,60 @@ const repairMatchData = (match: Match): Match => {
 // --- TOURNAMENT METHODS ---
 
 export const getTournaments = async (): Promise<Tournament[]> => {
-    try {
-        const snapshot = await getDocs(collection(db, TOURNAMENTS_COL));
-        return snapshot.docs.map(doc => doc.data() as Tournament);
-    } catch (error) {
-        console.error("Error fetching tournaments:", error);
-        return [];
-    }
+    return getStored<Tournament>(TOURNAMENTS_KEY);
+};
+
+export const getTournamentsByAdmin = async (adminId: string): Promise<Tournament[]> => {
+    const all = getStored<Tournament>(TOURNAMENTS_KEY);
+    return all.filter(t => t.adminId === adminId);
 };
 
 export const getTournament = async (id: string): Promise<Tournament | undefined> => {
-    try {
-        const docRef = doc(db, TOURNAMENTS_COL, id);
-        const docSnap = await getDoc(docRef);
-        return docSnap.exists() ? (docSnap.data() as Tournament) : undefined;
-    } catch (error) {
-        console.error("Error fetching tournament:", error);
-        return undefined;
-    }
+    const all = getStored<Tournament>(TOURNAMENTS_KEY);
+    return all.find(t => t.id === id);
 };
 
 export const saveTournament = async (tournament: Tournament) => {
-    try {
-        await setDoc(doc(db, TOURNAMENTS_COL, tournament.id), tournament);
-    } catch (error) {
-        console.error("Error saving tournament:", error);
+    const all = getStored<Tournament>(TOURNAMENTS_KEY);
+    const index = all.findIndex(t => t.id === tournament.id);
+    if (index >= 0) {
+        all[index] = tournament;
+    } else {
+        all.push(tournament);
     }
+    setStored(TOURNAMENTS_KEY, all);
 };
 
 // --- TEAM METHODS ---
 
 export const getTeams = async (tournamentId: string): Promise<Team[]> => {
-    try {
-        const q = query(collection(db, TEAMS_COL), where("tournamentId", "==", tournamentId));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => doc.data() as Team);
-    } catch (error) {
-        console.error("Error fetching teams:", error);
-        return [];
-    }
+    const all = getStored<Team>(TEAMS_KEY);
+    return all.filter(t => t.tournamentId === tournamentId);
 };
 
 export const saveTeam = async (team: Team) => {
-    await setDoc(doc(db, TEAMS_COL, team.id), team);
+    const all = getStored<Team>(TEAMS_KEY);
+    const index = all.findIndex(t => t.id === team.id);
+    if (index >= 0) {
+        all[index] = team;
+    } else {
+        all.push(team);
+    }
+    setStored(TEAMS_KEY, all);
 };
 
 export const deleteTeam = async (id: string) => {
-    await deleteDoc(doc(db, TEAMS_COL, id));
+    const all = getStored<Team>(TEAMS_KEY);
+    const filtered = all.filter(t => t.id !== id);
+    setStored(TEAMS_KEY, filtered);
 };
 
 // Player Management
 export const addPlayerToTeam = async (teamId: string, name: string, role: Player['role']) => {
-    const teamRef = doc(db, TEAMS_COL, teamId);
-    const teamSnap = await getDoc(teamRef);
-    if (teamSnap.exists()) {
-        const team = teamSnap.data() as Team;
+    const all = getStored<Team>(TEAMS_KEY);
+    const index = all.findIndex(t => t.id === teamId);
+    if (index >= 0) {
+        const team = all[index];
         const newPlayer: Player = {
             id: Date.now().toString() + Math.random().toString().slice(2,5),
             name,
@@ -113,19 +115,21 @@ export const addPlayerToTeam = async (teamId: string, name: string, role: Player
             totalRuns: 0,
             totalWickets: 0
         };
-        const updatedPlayers = team.players ? [...team.players, newPlayer] : [newPlayer];
-        await setDoc(teamRef, { ...team, players: updatedPlayers });
+        team.players = team.players ? [...team.players, newPlayer] : [newPlayer];
+        all[index] = team;
+        setStored(TEAMS_KEY, all);
     }
 };
 
 export const deletePlayerFromTeam = async (teamId: string, playerId: string) => {
-    const teamRef = doc(db, TEAMS_COL, teamId);
-    const teamSnap = await getDoc(teamRef);
-    if (teamSnap.exists()) {
-        const team = teamSnap.data() as Team;
+    const all = getStored<Team>(TEAMS_KEY);
+    const index = all.findIndex(t => t.id === teamId);
+    if (index >= 0) {
+        const team = all[index];
         if (team.players) {
-            const updatedPlayers = team.players.filter(p => p.id !== playerId);
-            await setDoc(teamRef, { ...team, players: updatedPlayers });
+            team.players = team.players.filter(p => p.id !== playerId);
+            all[index] = team;
+            setStored(TEAMS_KEY, all);
         }
     }
 };
@@ -133,31 +137,38 @@ export const deletePlayerFromTeam = async (teamId: string, playerId: string) => 
 // --- MATCH METHODS ---
 
 export const getMatches = async (tournamentId: string): Promise<Match[]> => {
-    try {
-        const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => repairMatchData(doc.data() as Match));
-    } catch (error) {
-        console.error("Error fetching matches:", error);
-        return [];
-    }
+    const all = getStored<Match>(MATCHES_KEY);
+    return all.filter(m => m.tournamentId === tournamentId).map(repairMatchData);
 };
 
-// REAL-TIME LISTENER (For Public View)
+// REAL-TIME LISTENER (Polled for LocalStorage)
 export const subscribeToMatches = (tournamentId: string, callback: (matches: Match[]) => void) => {
-    const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
-    return onSnapshot(q, (snapshot) => {
-        const matches = snapshot.docs.map(doc => repairMatchData(doc.data() as Match));
+    const fetch = () => {
+        const all = getStored<Match>(MATCHES_KEY);
+        const matches = all.filter(m => m.tournamentId === tournamentId).map(repairMatchData);
         callback(matches);
-    });
+    };
+    
+    fetch(); // Initial
+    const interval = setInterval(fetch, 2000); // Poll every 2 seconds
+    return () => clearInterval(interval);
 };
 
 export const saveMatch = async (match: Match) => {
-    await setDoc(doc(db, MATCHES_COL, match.id), match);
+    const all = getStored<Match>(MATCHES_KEY);
+    const index = all.findIndex(m => m.id === match.id);
+    if (index >= 0) {
+        all[index] = match;
+    } else {
+        all.push(match);
+    }
+    setStored(MATCHES_KEY, all);
 };
 
 export const deleteMatch = async (id: string) => {
-    await deleteDoc(doc(db, MATCHES_COL, id));
+    const all = getStored<Match>(MATCHES_KEY);
+    const filtered = all.filter(m => m.id !== id);
+    setStored(MATCHES_KEY, filtered);
 };
 
 export const initializeMatch = (

@@ -16,9 +16,13 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
 
   // Use liveDetails from match, or defaults
   const details = match.liveDetails || {
-    strikerName: 'Batsman 1', strikerRuns: 0, strikerBalls: 0,
-    nonStrikerName: 'Batsman 2', nonStrikerRuns: 0, nonStrikerBalls: 0,
-    bowlerName: 'Bowler', bowlerOvers: 0, bowlerRuns: 0, bowlerWickets: 0
+    strikerId: '', strikerName: 'Batsman 1',
+    nonStrikerId: '', nonStrikerName: 'Batsman 2',
+    bowlerId: '', bowlerName: 'Bowler',
+    // Fallbacks just in case
+    strikerRuns: 0, strikerBalls: 0,
+    nonStrikerRuns: 0, nonStrikerBalls: 0,
+    bowlerOvers: 0, bowlerRuns: 0, bowlerWickets: 0
   };
 
   // Helper to fetch live stats if available from scorecard

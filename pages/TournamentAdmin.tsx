@@ -5,7 +5,8 @@ import { Match, Team, Tournament, Player } from '../types';
 import { Layout } from '../components/Layout';
 import { AdminMatchControl } from '../components/AdminMatchControl';
 import { MatchCard } from '../components/MatchCard';
-import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2 } from 'lucide-react';
+import { auth } from '../services/firebase'; // Import auth to check user
+import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock } from 'lucide-react';
 
 export const TournamentAdmin: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +16,8 @@ export const TournamentAdmin: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [view, setView] = useState<'overview' | 'teams' | 'matches'>('overview');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   
   // Forms state
   const [newTeamName, setNewTeamName] = useState('');
@@ -46,7 +48,17 @@ export const TournamentAdmin: React.FC = () => {
   const refreshData = async () => {
     if (id) {
       setIsLoading(true);
+      
       const t = await getTournament(id);
+      
+      // SECURITY CHECK: Ensure current logged in user owns this tournament
+      const currentUser = auth.currentUser;
+      if (!t || !currentUser || t.adminId !== currentUser.uid) {
+          setPermissionDenied(true);
+          setIsLoading(false);
+          return;
+      }
+
       const tm = await getTeams(id);
       const m = await getMatches(id);
       setTournament(t);
@@ -117,8 +129,6 @@ export const TournamentAdmin: React.FC = () => {
     // Optimistic Update
     setActiveMatch(m);
     await saveMatch(m);
-    // Don't full refresh to keep UI smooth, rely on optimistic state
-    // But update matches list locally
     setMatches(prev => prev.map(pm => pm.id === m.id ? m : pm));
   };
 
@@ -137,7 +147,26 @@ export const TournamentAdmin: React.FC = () => {
       }
   }
 
-  if (!tournament && !isLoading) return <div>Not Found</div>;
+  if (permissionDenied) {
+      return (
+          <Layout>
+              <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+                  <Lock size={64} className="text-red-300 mb-4"/>
+                  <h1 className="text-2xl font-bold text-slate-800">Access Denied</h1>
+                  <p className="text-slate-500 mb-6">You do not have permission to manage this tournament.</p>
+                  <button onClick={() => navigate('/admin')} className="bg-slate-900 text-white px-6 py-2 rounded-lg">
+                      Back to Dashboard
+                  </button>
+              </div>
+          </Layout>
+      );
+  }
+
+  if ((!tournament && isLoading) || isLoading) {
+      return <Layout><div className="flex justify-center mt-20"><Loader2 className="animate-spin text-emerald-600" size={40}/></div></Layout>;
+  }
+
+  if (!tournament) return <div>Not Found</div>;
 
   return (
     <Layout>
@@ -190,9 +219,7 @@ export const TournamentAdmin: React.FC = () => {
           )}
       </div>
 
-      {isLoading && !activeMatch && !selectedTeamForSquad ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin" size={32}/></div>
-      ) : activeMatch ? (
+      {activeMatch ? (
           <AdminMatchControl 
             match={activeMatch}
             teamA={teams.find(t => t.id === activeMatch.teamAId)!}
