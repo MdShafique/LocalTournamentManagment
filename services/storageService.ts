@@ -20,6 +20,11 @@ const MATCHES_COL = 'matches';
 
 // --- HELPERS ---
 
+// Helper to remove undefined values because Firestore crashes with them
+const cleanForFirestore = <T>(data: T): T => {
+    return JSON.parse(JSON.stringify(data));
+};
+
 export const calculateOvers = (balls: number): number => {
   const full = Math.floor(balls / 6);
   const rem = balls % 6;
@@ -69,7 +74,7 @@ export const getTournament = async (id: string): Promise<Tournament | undefined>
 };
 
 export const saveTournament = async (tournament: Tournament) => {
-    await setDoc(doc(db, TOURNAMENTS_COL, tournament.id), tournament);
+    await setDoc(doc(db, TOURNAMENTS_COL, tournament.id), cleanForFirestore(tournament));
 };
 
 // --- TEAM METHODS ---
@@ -81,7 +86,7 @@ export const getTeams = async (tournamentId: string): Promise<Team[]> => {
 };
 
 export const saveTeam = async (team: Team) => {
-    await setDoc(doc(db, TEAMS_COL, team.id), team);
+    await setDoc(doc(db, TEAMS_COL, team.id), cleanForFirestore(team));
 };
 
 export const deleteTeam = async (id: string) => {
@@ -103,7 +108,7 @@ export const addPlayerToTeam = async (teamId: string, name: string, role: Player
             totalWickets: 0
         };
         const updatedPlayers = team.players ? [...team.players, newPlayer] : [newPlayer];
-        await setDoc(teamRef, { ...team, players: updatedPlayers });
+        await setDoc(teamRef, cleanForFirestore({ ...team, players: updatedPlayers }));
     }
 };
 
@@ -115,7 +120,7 @@ export const deletePlayerFromTeam = async (teamId: string, playerId: string) => 
         const team = teamSnap.data() as Team;
         if (team.players) {
             const updatedPlayers = team.players.filter(p => p.id !== playerId);
-            await setDoc(teamRef, { ...team, players: updatedPlayers });
+            await setDoc(teamRef, cleanForFirestore({ ...team, players: updatedPlayers }));
         }
     }
 };
@@ -143,7 +148,7 @@ export const subscribeToMatches = (tournamentId: string, callback: (matches: Mat
 };
 
 export const saveMatch = async (match: Match) => {
-    await setDoc(doc(db, MATCHES_COL, match.id), match);
+    await setDoc(doc(db, MATCHES_COL, match.id), cleanForFirestore(match));
 };
 
 export const deleteMatch = async (id: string) => {

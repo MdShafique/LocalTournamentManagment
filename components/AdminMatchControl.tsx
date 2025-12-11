@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player } from '../types';
 import { calculateOvers } from '../services/storageService';
@@ -88,16 +89,22 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
   const handleSwapBattingFirst = async () => {
       if (match.scoreA.balls > 0) return; 
       setIsUpdating(true);
-      const updatedMatch = { ...match };
-      const tempId = updatedMatch.teamAId;
-      updatedMatch.teamAId = updatedMatch.teamBId;
-      updatedMatch.teamBId = tempId;
-      updatedMatch.liveDetails = {
-        strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
-        bowlerId: '', bowlerName: ''
-      };
-      await onUpdate(updatedMatch);
-      setIsUpdating(false);
+      try {
+        const updatedMatch = { ...match };
+        const tempId = updatedMatch.teamAId;
+        updatedMatch.teamAId = updatedMatch.teamBId;
+        updatedMatch.teamBId = tempId;
+        updatedMatch.liveDetails = {
+          strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
+          bowlerId: '', bowlerName: ''
+        };
+        await onUpdate(updatedMatch);
+      } catch (error) {
+        console.error("Error swapping teams", error);
+        alert("Failed to swap teams. Check console.");
+      } finally {
+        setIsUpdating(false);
+      }
   };
 
   const handleScoreUpdate = async (runVal: number) => {
@@ -116,141 +123,153 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
       setIsUpdating(true);
 
-      // Clone Match Data
-      const updatedMatch = JSON.parse(JSON.stringify(match)) as Match;
-      if(!updatedMatch.scorecard) updatedMatch.scorecard = { A: { batting:[], bowling:[] }, B: { batting:[], bowling:[] } };
+      try {
+        // Clone Match Data
+        const updatedMatch = JSON.parse(JSON.stringify(match)) as Match;
+        if(!updatedMatch.scorecard) updatedMatch.scorecard = { A: { batting:[], bowling:[] }, B: { batting:[], bowling:[] } };
 
-      const targetScore = activeInnings === 'A' ? updatedMatch.scoreA : updatedMatch.scoreB;
-      const targetBattingList = activeInnings === 'A' ? updatedMatch.scorecard.A.batting : updatedMatch.scorecard.B.batting;
-      const targetBowlingList = activeInnings === 'A' ? updatedMatch.scorecard.B.bowling : updatedMatch.scorecard.A.bowling;
+        const targetScore = activeInnings === 'A' ? updatedMatch.scoreA : updatedMatch.scoreB;
+        const targetBattingList = activeInnings === 'A' ? updatedMatch.scorecard.A.batting : updatedMatch.scorecard.B.batting;
+        const targetBowlingList = activeInnings === 'A' ? updatedMatch.scorecard.B.bowling : updatedMatch.scorecard.A.bowling;
 
-      // 1. CALCULATE VALUES
-      let batsmanRuns = 0;
-      let teamExtras = 0;
-      let validBallCount = 0;
-      let bowlerRunsConceded = 0;
+        // 1. CALCULATE VALUES
+        let batsmanRuns = 0;
+        let teamExtras = 0;
+        let validBallCount = 0;
+        let bowlerRunsConceded = 0;
 
-      if (extraType === 'WIDE') {
-          teamExtras = 1 + runVal; 
-          batsmanRuns = 0;
-          validBallCount = 0;
-          bowlerRunsConceded = 1 + runVal;
-      } else if (extraType === 'NO_BALL') {
-          teamExtras = 1; 
-          batsmanRuns = runVal;
-          validBallCount = 0;
-          bowlerRunsConceded = 1 + runVal;
-      } else if (extraType === 'LEG_BYE' || extraType === 'BYE') {
-          teamExtras = runVal;
-          batsmanRuns = 0;
-          validBallCount = 1;
-          bowlerRunsConceded = 0; 
-      } else {
-          teamExtras = 0;
-          batsmanRuns = runVal;
-          validBallCount = 1;
-          bowlerRunsConceded = runVal;
+        if (extraType === 'WIDE') {
+            teamExtras = 1 + runVal; 
+            batsmanRuns = 0;
+            validBallCount = 0;
+            bowlerRunsConceded = 1 + runVal;
+        } else if (extraType === 'NO_BALL') {
+            teamExtras = 1; 
+            batsmanRuns = runVal;
+            validBallCount = 0;
+            bowlerRunsConceded = 1 + runVal;
+        } else if (extraType === 'LEG_BYE' || extraType === 'BYE') {
+            teamExtras = runVal;
+            batsmanRuns = 0;
+            validBallCount = 1;
+            bowlerRunsConceded = 0; 
+        } else {
+            teamExtras = 0;
+            batsmanRuns = runVal;
+            validBallCount = 1;
+            bowlerRunsConceded = runVal;
+        }
+
+        // 2. UPDATE BATSMAN STATS
+        const batsman = getBattingStats(strikerId, targetBattingList, battingTeam);
+        if (extraType !== 'WIDE') {
+            batsman.balls += 1; 
+            if (extraType === 'NO_BALL') batsman.balls -= 1; 
+        }
+        
+        batsman.runs += batsmanRuns;
+        if (batsmanRuns === 4) batsman.fours += 1;
+        if (batsmanRuns === 6) batsman.sixes += 1;
+        
+        if (isWicket) {
+            batsman.isOut = true;
+            batsman.dismissal = extraType === 'NONE' ? 'b ' + getBowlingStats(bowlerId, targetBowlingList, bowlingTeam).playerName : 'Run Out';
+        }
+
+        // 3. UPDATE BOWLER STATS
+        const bowler = getBowlingStats(bowlerId, targetBowlingList, bowlingTeam);
+        if (validBallCount === 1) {
+            bowler.ballsBowled += 1;
+        }
+        bowler.runsConceded += bowlerRunsConceded;
+        if (isWicket && extraType !== 'WIDE' && extraType !== 'NO_BALL') {
+             bowler.wickets += 1; 
+        }
+        bowler.overs = calculateOvers(bowler.ballsBowled);
+
+        // 4. UPDATE TEAM SCORE
+        targetScore.runs += batsmanRuns + teamExtras;
+        if (isWicket) targetScore.wickets += 1;
+        targetScore.balls += validBallCount;
+        targetScore.overs = calculateOvers(targetScore.balls);
+
+        // 5. STRIKE ROTATION & END OF OVER LOGIC
+        let nextStriker = strikerId;
+        let nextNonStriker = nonStrikerId;
+        let nextBowler = bowlerId;
+
+        if (runVal % 2 !== 0) {
+            const temp = nextStriker;
+            nextStriker = nextNonStriker;
+            nextNonStriker = temp;
+        }
+
+        const isOverUp = targetScore.balls > 0 && targetScore.balls % 6 === 0 && validBallCount === 1;
+        if (isOverUp) {
+            const temp = nextStriker;
+            nextStriker = nextNonStriker;
+            nextNonStriker = temp;
+            nextBowler = ''; 
+        }
+
+        if (isWicket) {
+            nextStriker = ''; 
+        }
+
+        // 6. AUTO-COMPLETE CHECKS
+        let autoWinnerId: string | undefined = undefined;
+        let autoStatus = match.status;
+
+        if (activeInnings === 'B') {
+            if (targetScore.runs >= match.scoreA.runs + 1) {
+                autoStatus = MatchStatus.COMPLETED;
+                autoWinnerId = teamB.id;
+                nextStriker = ''; nextNonStriker = ''; nextBowler = '';
+            } else if (targetScore.wickets === 10 || targetScore.balls === match.totalOvers * 6) {
+                if (targetScore.runs < match.scoreA.runs) {
+                    autoStatus = MatchStatus.COMPLETED;
+                    autoWinnerId = teamA.id;
+                } else if (targetScore.runs === match.scoreA.runs) {
+                    autoStatus = MatchStatus.COMPLETED;
+                }
+            }
+        } else {
+            if (targetScore.wickets === 10 || targetScore.balls === match.totalOvers * 6) {
+                nextBowler = '';
+            }
+        }
+
+        updatedMatch.liveDetails = {
+            strikerId: nextStriker,
+            strikerName: nextStriker ? targetBattingList.find(p=>p.playerId===nextStriker)?.playerName || 'Select' : '',
+            nonStrikerId: nextNonStriker,
+            nonStrikerName: nextNonStriker ? targetBattingList.find(p=>p.playerId===nextNonStriker)?.playerName || 'Select' : '',
+            bowlerId: nextBowler,
+            bowlerName: nextBowler ? targetBowlingList.find(p=>p.playerId===nextBowler)?.playerName || 'Select' : '',
+        };
+
+        updatedMatch.status = autoStatus === MatchStatus.COMPLETED ? MatchStatus.COMPLETED : MatchStatus.LIVE;
+        
+        // Handle winnerId safely
+        if (autoWinnerId) {
+            updatedMatch.winnerId = autoWinnerId;
+        } else {
+            delete updatedMatch.winnerId;
+        }
+
+        setExtraType('NONE');
+        setIsWicket(false);
+        setStrikerId(nextStriker);
+        setNonStrikerId(nextNonStriker);
+        setBowlerId(nextBowler);
+
+        await onUpdate(updatedMatch);
+      } catch (e) {
+        console.error("Scoring Error:", e);
+        alert("Failed to update score. Please try again.");
+      } finally {
+        setIsUpdating(false);
       }
-
-      // 2. UPDATE BATSMAN STATS
-      const batsman = getBattingStats(strikerId, targetBattingList, battingTeam);
-      if (extraType !== 'WIDE') {
-          batsman.balls += 1; 
-          if (extraType === 'NO_BALL') batsman.balls -= 1; 
-      }
-      
-      batsman.runs += batsmanRuns;
-      if (batsmanRuns === 4) batsman.fours += 1;
-      if (batsmanRuns === 6) batsman.sixes += 1;
-      
-      if (isWicket) {
-          batsman.isOut = true;
-          batsman.dismissal = extraType === 'NONE' ? 'b ' + getBowlingStats(bowlerId, targetBowlingList, bowlingTeam).playerName : 'Run Out';
-      }
-
-      // 3. UPDATE BOWLER STATS
-      const bowler = getBowlingStats(bowlerId, targetBowlingList, bowlingTeam);
-      if (validBallCount === 1) {
-          bowler.ballsBowled += 1;
-      }
-      bowler.runsConceded += bowlerRunsConceded;
-      if (isWicket && extraType !== 'WIDE' && extraType !== 'NO_BALL') {
-           bowler.wickets += 1; 
-      }
-      bowler.overs = calculateOvers(bowler.ballsBowled);
-
-      // 4. UPDATE TEAM SCORE
-      targetScore.runs += batsmanRuns + teamExtras;
-      if (isWicket) targetScore.wickets += 1;
-      targetScore.balls += validBallCount;
-      targetScore.overs = calculateOvers(targetScore.balls);
-
-      // 5. STRIKE ROTATION & END OF OVER LOGIC
-      let nextStriker = strikerId;
-      let nextNonStriker = nonStrikerId;
-      let nextBowler = bowlerId;
-
-      if (runVal % 2 !== 0) {
-          const temp = nextStriker;
-          nextStriker = nextNonStriker;
-          nextNonStriker = temp;
-      }
-
-      const isOverUp = targetScore.balls > 0 && targetScore.balls % 6 === 0 && validBallCount === 1;
-      if (isOverUp) {
-          const temp = nextStriker;
-          nextStriker = nextNonStriker;
-          nextNonStriker = temp;
-          nextBowler = ''; 
-      }
-
-      if (isWicket) {
-          nextStriker = ''; 
-      }
-
-      // 6. AUTO-COMPLETE CHECKS
-      let autoWinnerId = undefined;
-      let autoStatus = match.status;
-
-      if (activeInnings === 'B') {
-          if (targetScore.runs >= match.scoreA.runs + 1) {
-              autoStatus = MatchStatus.COMPLETED;
-              autoWinnerId = teamB.id;
-              nextStriker = ''; nextNonStriker = ''; nextBowler = '';
-          } else if (targetScore.wickets === 10 || targetScore.balls === match.totalOvers * 6) {
-              if (targetScore.runs < match.scoreA.runs) {
-                  autoStatus = MatchStatus.COMPLETED;
-                  autoWinnerId = teamA.id;
-              } else if (targetScore.runs === match.scoreA.runs) {
-                  autoStatus = MatchStatus.COMPLETED;
-              }
-          }
-      } else {
-          if (targetScore.wickets === 10 || targetScore.balls === match.totalOvers * 6) {
-              nextBowler = '';
-          }
-      }
-
-      updatedMatch.liveDetails = {
-          strikerId: nextStriker,
-          strikerName: nextStriker ? targetBattingList.find(p=>p.playerId===nextStriker)?.playerName || 'Select' : '',
-          nonStrikerId: nextNonStriker,
-          nonStrikerName: nextNonStriker ? targetBattingList.find(p=>p.playerId===nextNonStriker)?.playerName || 'Select' : '',
-          bowlerId: nextBowler,
-          bowlerName: nextBowler ? targetBowlingList.find(p=>p.playerId===nextBowler)?.playerName || 'Select' : '',
-      };
-
-      updatedMatch.status = autoStatus === MatchStatus.COMPLETED ? MatchStatus.COMPLETED : MatchStatus.LIVE;
-      updatedMatch.winnerId = autoWinnerId;
-
-      setExtraType('NONE');
-      setIsWicket(false);
-      setStrikerId(nextStriker);
-      setNonStrikerId(nextNonStriker);
-      setBowlerId(nextBowler);
-
-      await onUpdate(updatedMatch);
-      setIsUpdating(false);
   };
 
   const getAvailableBatsmen = () => {
@@ -264,14 +283,19 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
   
   const startInningsB = async () => {
       setIsUpdating(true);
-      const updated = { ...match };
-      setActiveInnings('B');
-      updated.liveDetails = {
-          strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
-          bowlerId: '', bowlerName: ''
-      };
-      await onUpdate(updated);
-      setIsUpdating(false);
+      try {
+        const updated = { ...match };
+        setActiveInnings('B');
+        updated.liveDetails = {
+            strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
+            bowlerId: '', bowlerName: ''
+        };
+        await onUpdate(updated);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsUpdating(false);
+      }
   };
 
   const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6);

@@ -17,7 +17,7 @@ export const Layout: React.FC<{ children: React.ReactNode; title?: string }> = (
             <div className="flex items-center gap-3 z-10">
               <Link to="/" className="flex items-center gap-2">
                 <Trophy className="h-8 w-8 text-yellow-400" />
-                <span className="font-bold text-xl tracking-tight hidden sm:block">CricManage Pro</span>
+                <span className="font-bold text-xl tracking-tight hidden sm:block">Badar Khali Premier League</span>
               </Link>
             </div>
 
@@ -57,7 +57,7 @@ export const Layout: React.FC<{ children: React.ReactNode; title?: string }> = (
 
       <footer className="bg-slate-900 text-slate-400 py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm">© {new Date().getFullYear()} CricManage Pro. Local Cricket Tournament Manager.</p>
+          <p className="text-sm">© {new Date().getFullYear()} Badar Khali Premier League.</p>
         </div>
       </footer>
     </div>
