@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getMatches, getTeams, getTournament } from '../services/storageService';
+import { getTeams, getTournament, subscribeToMatches } from '../services/storageService';
 import { calculateTable } from '../utils/statsHelper';
 import { Match, Team, Tournament, TableRow, MatchStatus } from '../types';
 import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
-import { Trophy, Activity, Calendar as CalIcon, BarChart3, Shield } from 'lucide-react';
+import { Trophy, Activity, Calendar as CalIcon, BarChart3, Shield, Loader2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
 export const PublicView: React.FC = () => {
@@ -16,42 +16,50 @@ export const PublicView: React.FC = () => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [table, setTable] = useState<TableRow[]>([]);
   const [activeTab, setActiveTab] = useState<'matches' | 'table' | 'squads' | 'stats'>('matches');
+  const [loading, setLoading] = useState(true);
   
   // Modal State
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
-  const refreshData = () => {
-    if (id) {
-      const t = getTournament(id);
-      if (t) {
-        setTournament(t);
-        const tm = getTeams(id);
-        const m = getMatches(id);
-        setTeams(tm);
-        setMatches(m);
-        setTable(calculateTable(tm, m));
-        
-        // Update modal if open
-        if (selectedMatch) {
-            const updated = m.find(mx => mx.id === selectedMatch.id);
-            if (updated) setSelectedMatch(updated);
-        }
-      }
-    }
-  };
-
+  // Initial Load (Teams & Tournament Info)
   useEffect(() => {
-    refreshData();
+    const loadStaticData = async () => {
+        if (id) {
+            const t = await getTournament(id);
+            const tm = await getTeams(id);
+            setTournament(t);
+            setTeams(tm);
+            setLoading(false);
+        }
+    };
+    loadStaticData();
   }, [id]);
 
+  // REAL-TIME LISTENER FOR MATCHES
   useEffect(() => {
-      const interval = setInterval(() => {
-          refreshData();
-      }, 5000);
-      return () => clearInterval(interval);
-  }, [id, selectedMatch]); // Re-run if selected match changes to keep it updated
+      if (!id) return;
 
-  if (!tournament) return <Layout><div className="text-center mt-20">Loading Tournament...</div></Layout>;
+      // Subscribe to real-time updates
+      const unsubscribe = subscribeToMatches(id, (updatedMatches) => {
+          setMatches(updatedMatches);
+          
+          // Re-calculate table whenever matches update
+          if (teams.length > 0) {
+             setTable(calculateTable(teams, updatedMatches));
+          }
+
+          // If a modal is open, update its data live!
+          if (selectedMatch) {
+              const current = updatedMatches.find(m => m.id === selectedMatch.id);
+              if (current) setSelectedMatch(current);
+          }
+      });
+
+      // Cleanup listener on unmount
+      return () => unsubscribe();
+  }, [id, teams.length, selectedMatch?.id]); 
+
+  if (loading || !tournament) return <Layout><div className="flex justify-center mt-20"><Loader2 className="animate-spin text-emerald-600" size={40}/></div></Layout>;
 
   const liveMatches = matches.filter(m => m.status === MatchStatus.LIVE);
   const upcomingMatches = matches.filter(m => m.status === MatchStatus.SCHEDULED).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());

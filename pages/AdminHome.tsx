@@ -3,33 +3,40 @@ import { useNavigate } from 'react-router-dom';
 import { getTournaments, saveTournament } from '../services/storageService';
 import { Tournament } from '../types';
 import { Layout } from '../components/Layout';
-import { Plus, ChevronRight, LogIn } from 'lucide-react';
+import { Plus, ChevronRight, LogIn, Loader2 } from 'lucide-react';
 
 export const AdminHome: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [newTourneyName, setNewTourneyName] = useState('');
   const navigate = useNavigate();
 
+  const loadTournaments = async () => {
+      setIsLoading(true);
+      const data = await getTournaments();
+      setTournaments(data);
+      setIsLoading(false);
+  };
+
   useEffect(() => {
-    // Simulating Auth check
     const auth = localStorage.getItem('cric_auth');
     if (auth) {
         setIsLoggedIn(true);
-        setTournaments(getTournaments());
+        loadTournaments();
     }
   }, []);
 
   const handleLogin = () => {
-      // Simulation of Google Login
       localStorage.setItem('cric_auth', 'true');
       setIsLoggedIn(true);
-      setTournaments(getTournaments());
+      loadTournaments();
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
       e.preventDefault();
+      setIsLoading(true);
       const newT: Tournament = {
           id: Date.now().toString(),
           name: newTourneyName,
@@ -37,10 +44,11 @@ export const AdminHome: React.FC = () => {
           endDate: new Date().toISOString(),
           adminId: 'admin_1'
       };
-      saveTournament(newT);
-      setTournaments(getTournaments());
+      await saveTournament(newT);
+      await loadTournaments();
       setShowCreate(false);
       setNewTourneyName('');
+      setIsLoading(false);
   };
 
   if (!isLoggedIn) {
@@ -58,7 +66,7 @@ export const AdminHome: React.FC = () => {
                       Sign in with Google
                   </button>
                   <div className="mt-6 text-xs text-slate-400">
-                      Note: This is a demo. Clicking simply logs you in.
+                      Note: This is a demo. Clicking simply logs you in locally.
                   </div>
               </div>
           </div>
@@ -89,37 +97,41 @@ export const AdminHome: React.FC = () => {
                         placeholder="Tournament Name (e.g. Summer Cup 2024)"
                         className="flex-1 border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
-                    <button type="submit" className="bg-slate-900 text-white px-6 py-2 rounded-lg hover:bg-slate-800">
-                        Create
+                    <button type="submit" disabled={isLoading} className="bg-slate-900 text-white px-6 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50">
+                        {isLoading ? 'Creating...' : 'Create'}
                     </button>
                 </form>
             </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {tournaments.map(t => (
-                <div 
-                    key={t.id} 
-                    onClick={() => navigate(`/admin/tournament/${t.id}`)}
-                    className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer group"
-                >
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
-                            <span className="font-bold text-xl">{t.name[0]}</span>
+        {isLoading && tournaments.length === 0 ? (
+            <div className="flex justify-center py-20"><Loader2 className="animate-spin text-emerald-600" size={32}/></div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {tournaments.map(t => (
+                    <div 
+                        key={t.id} 
+                        onClick={() => navigate(`/admin/tournament/${t.id}`)}
+                        className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer group"
+                    >
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                                <span className="font-bold text-xl">{t.name[0]}</span>
+                            </div>
+                            <ChevronRight className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
                         </div>
-                        <ChevronRight className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                        <h3 className="text-lg font-bold text-slate-900 mb-1">{t.name}</h3>
+                        <p className="text-sm text-slate-500">Created: {new Date(t.startDate).toLocaleDateString()}</p>
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-1">{t.name}</h3>
-                    <p className="text-sm text-slate-500">Created: {new Date(t.startDate).toLocaleDateString()}</p>
-                </div>
-            ))}
-            
-            {tournaments.length === 0 && !showCreate && (
-                <div className="col-span-full text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-                    <p className="text-slate-400">No tournaments found. Create your first one!</p>
-                </div>
-            )}
-        </div>
+                ))}
+                
+                {tournaments.length === 0 && !showCreate && (
+                    <div className="col-span-full text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+                        <p className="text-slate-400">No tournaments found. Create your first one!</p>
+                    </div>
+                )}
+            </div>
+        )}
     </Layout>
   );
 };

@@ -5,7 +5,7 @@ import { Match, Team, Tournament, Player } from '../types';
 import { Layout } from '../components/Layout';
 import { AdminMatchControl } from '../components/AdminMatchControl';
 import { MatchCard } from '../components/MatchCard';
-import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2 } from 'lucide-react';
+import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2 } from 'lucide-react';
 
 export const TournamentAdmin: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +15,7 @@ export const TournamentAdmin: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [view, setView] = useState<'overview' | 'teams' | 'matches'>('overview');
+  const [isLoading, setIsLoading] = useState(false);
   
   // Forms state
   const [newTeamName, setNewTeamName] = useState('');
@@ -35,26 +36,32 @@ export const TournamentAdmin: React.FC = () => {
       time: '10:00',
       overs: 20,
       type: 'T20',
-      groupStage: 'Group Stage' // Now editable
+      groupStage: 'Group Stage'
   });
 
   useEffect(() => {
     refreshData();
   }, [id]);
 
-  const refreshData = () => {
+  const refreshData = async () => {
     if (id) {
-      setTournament(getTournament(id));
-      setTeams(getTeams(id));
-      setMatches(getMatches(id));
+      setIsLoading(true);
+      const t = await getTournament(id);
+      const tm = await getTeams(id);
+      const m = await getMatches(id);
+      setTournament(t);
+      setTeams(tm);
+      setMatches(m);
+      
       if (selectedTeamForSquad) {
-          const updatedTeam = getTeams(id).find(t => t.id === selectedTeamForSquad.id);
+          const updatedTeam = tm.find(team => team.id === selectedTeamForSquad.id);
           setSelectedTeamForSquad(updatedTeam || null);
       }
+      setIsLoading(false);
     }
   };
 
-  const handleAddTeam = () => {
+  const handleAddTeam = async () => {
     if (!newTeamName.trim() || !id) return;
     const newTeam: Team = {
       id: Date.now().toString(),
@@ -64,25 +71,25 @@ export const TournamentAdmin: React.FC = () => {
       group: newTeamGroup,
       players: []
     };
-    saveTeam(newTeam);
+    await saveTeam(newTeam);
     setNewTeamName('');
-    refreshData();
+    await refreshData();
   };
 
-  const handleAddPlayer = () => {
+  const handleAddPlayer = async () => {
       if (!selectedTeamForSquad || !newPlayerName.trim()) return;
-      addPlayerToTeam(selectedTeamForSquad.id, newPlayerName, newPlayerRole);
+      await addPlayerToTeam(selectedTeamForSquad.id, newPlayerName, newPlayerRole);
       setNewPlayerName('');
-      refreshData();
+      await refreshData();
   };
 
-  const handleDeletePlayer = (playerId: string) => {
+  const handleDeletePlayer = async (playerId: string) => {
       if (!selectedTeamForSquad) return;
-      deletePlayerFromTeam(selectedTeamForSquad.id, playerId);
-      refreshData();
+      await deletePlayerFromTeam(selectedTeamForSquad.id, playerId);
+      await refreshData();
   };
 
-  const handleCreateMatch = (e: React.FormEvent) => {
+  const handleCreateMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
     if (schedData.teamA === schedData.teamB) {
@@ -100,36 +107,37 @@ export const TournamentAdmin: React.FC = () => {
         schedData.overs,
         schedData.groupStage
     );
-    saveMatch(m);
-    refreshData();
+    await saveMatch(m);
+    await refreshData();
     setShowScheduler(false);
     setView('matches');
   };
 
-  const handleUpdateMatch = (m: Match) => {
-    saveMatch(m);
-    refreshData();
-    if (activeMatch && activeMatch.id === m.id) {
-        setActiveMatch(m);
-    }
+  const handleUpdateMatch = async (m: Match) => {
+    // Optimistic Update
+    setActiveMatch(m);
+    await saveMatch(m);
+    // Don't full refresh to keep UI smooth, rely on optimistic state
+    // But update matches list locally
+    setMatches(prev => prev.map(pm => pm.id === m.id ? m : pm));
   };
 
-  const handleDeleteMatch = (mid: string) => {
+  const handleDeleteMatch = async (mid: string) => {
       if(window.confirm('Delete match?')) {
-        deleteMatch(mid);
+        await deleteMatch(mid);
         setActiveMatch(null);
-        refreshData();
+        await refreshData();
       }
   };
 
-  const handleDeleteTeam = (tid: string) => {
+  const handleDeleteTeam = async (tid: string) => {
       if(window.confirm('Delete team?')) {
-          deleteTeam(tid);
-          refreshData();
+          await deleteTeam(tid);
+          await refreshData();
       }
   }
 
-  if (!tournament) return <div>Not Found</div>;
+  if (!tournament && !isLoading) return <div>Not Found</div>;
 
   return (
     <Layout>
@@ -138,18 +146,22 @@ export const TournamentAdmin: React.FC = () => {
            <button onClick={() => navigate('/admin')} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm mb-2">
                <ArrowLeft size={16}/> Back to Dashboard
            </button>
-           <h1 className="text-2xl font-bold text-slate-900">{tournament.name} <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded">Admin</span></h1>
+           {tournament && (
+               <h1 className="text-2xl font-bold text-slate-900">{tournament.name} <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded">Admin</span></h1>
+           )}
         </div>
-        <button 
-          onClick={() => {
-              const url = `${window.location.origin}/#/view/${tournament.id}`;
-              navigator.clipboard.writeText(url);
-              alert('Public Viewer URL copied to clipboard: ' + url);
-          }}
-          className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100 transition"
-        >
-            <Share2 size={18} /> Share Public Link
-        </button>
+        {tournament && (
+            <button 
+            onClick={() => {
+                const url = `${window.location.origin}/#/view/${tournament.id}`;
+                navigator.clipboard.writeText(url);
+                alert('Public Viewer URL copied to clipboard: ' + url);
+            }}
+            className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100 transition"
+            >
+                <Share2 size={18} /> Share Public Link
+            </button>
+        )}
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-slate-200">
@@ -166,13 +178,11 @@ export const TournamentAdmin: React.FC = () => {
                   {tab.label}
               </button>
           ))}
-          {/* Active Live Match Tab */}
           {activeMatch && (
               <button className="px-4 py-2 rounded-lg font-medium bg-red-600 text-white flex items-center gap-2 animate-pulse">
                   <div className="w-2 h-2 bg-white rounded-full"></div> Live Console
               </button>
           )}
-           {/* Squad Tab Indicator */}
            {selectedTeamForSquad && (
               <button className="px-4 py-2 rounded-lg font-medium bg-emerald-600 text-white">
                   Managing: {selectedTeamForSquad.shortName}
@@ -180,7 +190,9 @@ export const TournamentAdmin: React.FC = () => {
           )}
       </div>
 
-      {activeMatch ? (
+      {isLoading && !activeMatch && !selectedTeamForSquad ? (
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin" size={32}/></div>
+      ) : activeMatch ? (
           <AdminMatchControl 
             match={activeMatch}
             teamA={teams.find(t => t.id === activeMatch.teamAId)!}
@@ -189,7 +201,6 @@ export const TournamentAdmin: React.FC = () => {
             onDelete={() => handleDeleteMatch(activeMatch.id)}
           />
       ) : selectedTeamForSquad ? (
-          // SQUAD MANAGEMENT UI
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-fade-in-up">
               <div className="flex justify-between items-center mb-6 border-b pb-4">
                   <h3 className="font-bold text-lg">Manage Squad: {selectedTeamForSquad.name}</h3>
@@ -336,7 +347,6 @@ export const TournamentAdmin: React.FC = () => {
         </>
       )}
 
-      {/* Scheduler Modal */}
       {showScheduler && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-fade-in-up">
@@ -345,18 +355,16 @@ export const TournamentAdmin: React.FC = () => {
                       <button onClick={() => setShowScheduler(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
                   </div>
                   <form onSubmit={handleCreateMatch} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <div className="col-span-2">
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Match Stage (Manually Enter)</label>
-                              <input 
-                                type="text"
-                                required
-                                placeholder="e.g. Semi Final 1, Final, Group A"
-                                value={schedData.groupStage}
-                                onChange={(e) => setSchedData({...schedData, groupStage: e.target.value})}
-                                className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50"
-                              />
-                          </div>
+                      <div className="col-span-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Match Stage</label>
+                          <input 
+                            type="text"
+                            required
+                            placeholder="e.g. Semi Final 1"
+                            value={schedData.groupStage}
+                            onChange={(e) => setSchedData({...schedData, groupStage: e.target.value})}
+                            className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50"
+                          />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -424,7 +432,7 @@ export const TournamentAdmin: React.FC = () => {
                               />
                           </div>
                           <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Format Name</label>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Format</label>
                               <input 
                                 type="text"
                                 required
