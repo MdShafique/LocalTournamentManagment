@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player } from '../types';
 import { calculateOvers } from '../services/storageService';
 import { generateAICommentary } from '../services/geminiService';
-import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft } from 'lucide-react';
+import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand } from 'lucide-react';
 
 interface Props {
   match: Match;
@@ -47,16 +47,17 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
           setBowlerId(match.liveDetails.bowlerId);
       }
       
-      const innADone = match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6;
+      const innADone = match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared;
+      
       if (innADone && match.scoreB.balls === 0 && match.scoreB.runs === 0 && match.status !== MatchStatus.COMPLETED) {
           setActiveInnings('B');
-      } else if (match.scoreB.balls > 0) {
+      } else if (match.scoreB.balls > 0 || (match.scoreB.runs > 0) || match.scoreB.isDeclared) {
           setActiveInnings('B');
       } else {
           setActiveInnings('A');
       }
 
-  }, [match.id, match.scoreA.balls, match.scoreB.balls, match.status]); 
+  }, [match.id, match.scoreA, match.scoreB, match.status]); 
 
   const getBattingStats = (pid: string, list: BattingStats[], team: Team): BattingStats => {
       let stats = list.find(p => p.playerId === pid);
@@ -84,6 +85,49 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
           list.push(stats);
       }
       return stats;
+  };
+
+  const handleManualEndInnings = async () => {
+      const message = activeInnings === 'A' 
+          ? "Are you sure you want to END the 1st Innings now?" 
+          : "Are you sure you want to END the Match now? (Winner will be calculated based on current runs)";
+      
+      if (!window.confirm(message)) return;
+
+      setIsUpdating(true);
+      try {
+          const updated = { ...match };
+          
+          if (activeInnings === 'A') {
+              updated.scoreA.isDeclared = true;
+              updated.liveDetails = {
+                strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
+                bowlerId: '', bowlerName: ''
+              };
+          } else {
+              updated.scoreB.isDeclared = true;
+              updated.status = MatchStatus.COMPLETED;
+              // Calculate Winner
+              if (updated.scoreB.runs > updated.scoreA.runs) {
+                  updated.winnerId = teamB.id;
+              } else if (updated.scoreA.runs > updated.scoreB.runs) {
+                  updated.winnerId = teamA.id;
+              } else {
+                  // Tie
+                  updated.winnerId = undefined; 
+              }
+              // Clear Live players
+              updated.liveDetails = {
+                strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
+                bowlerId: '', bowlerName: ''
+              };
+          }
+          await onUpdate(updated);
+      } catch (error) {
+          console.error("Error ending innings manually", error);
+      } finally {
+          setIsUpdating(false);
+      }
   };
 
   const handleSwapBattingFirst = async () => {
@@ -298,7 +342,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       }
   };
 
-  const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6);
+  const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared);
   const canSwapTeams = match.scoreA.balls === 0 && match.scoreA.runs === 0 && match.status !== MatchStatus.COMPLETED;
 
   return (
@@ -317,6 +361,17 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
              </p>
          </div>
          <div className="flex gap-2">
+            {match.status === MatchStatus.LIVE && (
+                <button 
+                    onClick={handleManualEndInnings}
+                    disabled={isUpdating}
+                    className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded flex items-center gap-2 text-sm font-bold border border-orange-200"
+                    title={activeInnings === 'A' ? "End 1st Innings" : "End Match"}
+                >
+                    <Hand size={18} /> <span className="hidden sm:inline">{activeInnings === 'A' ? "End Innings" : "End Match"}</span>
+                </button>
+            )}
+
             {canSwapTeams && (
                 <button 
                     onClick={handleSwapBattingFirst}
@@ -336,9 +391,9 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
            <div className="text-center py-8">
                <h3 className="text-2xl font-bold text-slate-800 mb-2">Match Completed</h3>
                <p className="text-emerald-600 font-bold text-lg mb-6">
-                   Winner: {match.winnerId === teamA.id ? teamA.name : teamB.name}
+                   Winner: {match.winnerId === teamA.id ? teamA.name : (match.winnerId === teamB.id ? teamB.name : "Match Tied")}
                </p>
-               <button onClick={() => onUpdate({...match, status: MatchStatus.LIVE, winnerId: undefined})} className="text-sm underline text-slate-400">
+               <button onClick={() => onUpdate({...match, status: MatchStatus.LIVE, winnerId: undefined, scoreB: {...match.scoreB, isDeclared: false}})} className="text-sm underline text-slate-400">
                    Re-open Match (Undo Result)
                </button>
            </div>

@@ -57,7 +57,7 @@ export const Layout: React.FC<{ children: React.ReactNode; title?: string }> = (
 
       <footer className="bg-slate-900 text-slate-400 py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm">© {new Date().getFullYear()} Badar Khali Premier League.</p>
+          <p className="text-sm">© {new Date().getFullYear()} Badar Khali Premier League Cricket Tournament.</p>
         </div>
       </footer>
     </div>

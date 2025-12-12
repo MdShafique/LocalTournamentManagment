@@ -1,3 +1,4 @@
+
 export enum MatchStatus {
   SCHEDULED = 'SCHEDULED',
   LIVE = 'LIVE',
@@ -28,6 +29,7 @@ export interface InningsScore {
   wickets: number;
   overs: number;
   balls: number;
+  isDeclared?: boolean; // New field to handle manual innings end
 }
 
 export interface BattingStats {

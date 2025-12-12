@@ -5,7 +5,7 @@ import { getTournamentsByAdmin, saveTournament } from '../services/storageServic
 import { auth, googleProvider, signInWithPopup, onAuthStateChanged, User, signOut } from '../services/firebase';
 import { Tournament } from '../types';
 import { Layout } from '../components/Layout';
-import { Plus, ChevronRight, LogOut, Loader2, User as UserIcon, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronRight, LogOut, Loader2, User as UserIcon, AlertTriangle, Settings } from 'lucide-react';
 
 export const AdminHome: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -15,7 +15,7 @@ export const AdminHome: React.FC = () => {
   const [newTourneyName, setNewTourneyName] = useState('');
   
   // Auth Error State
-  const [authError, setAuthError] = useState('');
+  const [authError, setAuthError] = useState<{message: string, type?: string} | null>(null);
 
   const navigate = useNavigate();
 
@@ -45,15 +45,25 @@ export const AdminHome: React.FC = () => {
   };
 
   const handleLogin = async () => {
-      setAuthError('');
+      setAuthError(null);
       try {
           await signInWithPopup(auth, googleProvider);
       } catch (error: any) {
           console.error("Login Failed", error);
-          if (error.code === 'auth/popup-closed-by-user') {
-             setAuthError("Login cancelled by user.");
+          if (error.code === 'auth/configuration-not-found') {
+             setAuthError({
+                 type: 'config',
+                 message: "Google Sign-In is disabled in Firebase Console."
+             });
+          } else if (error.code === 'auth/unauthorized-domain') {
+             setAuthError({
+                 type: 'domain',
+                 message: "Domain not authorized."
+             });
+          } else if (error.code === 'auth/popup-closed-by-user') {
+             setAuthError({ message: "Login cancelled." });
           } else {
-             setAuthError(error.message || "Login failed. Please check your internet connection.");
+             setAuthError({ message: error.message || "Login failed." });
           }
       }
   };
@@ -91,17 +101,41 @@ export const AdminHome: React.FC = () => {
           <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
               <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
                   <div className="text-center mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Badar Khali Premier League</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">CricManage Pro</h1>
                     <p className="text-slate-500">Admin Portal Access</p>
                   </div>
                   
                   {authError && (
-                      <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4 text-left border border-red-200 flex gap-2">
-                          <AlertTriangle size={16} className="shrink-0 mt-0.5"/> 
-                          <div>
+                      <div className="bg-red-50 text-red-600 text-sm p-4 rounded-lg mb-6 border border-red-200">
+                          <div className="flex gap-2 items-start mb-2">
+                              <AlertTriangle size={18} className="shrink-0 mt-0.5"/> 
                               <p className="font-bold">Connection Failed</p>
-                              <p>{authError}</p>
                           </div>
+                          
+                          {authError.type === 'config' ? (
+                              <div className="ml-6 text-xs text-slate-700 space-y-2">
+                                  <p>Firebase Console-এ Google Sign-In চালু করা নেই।</p>
+                                  <ol className="list-decimal pl-4 space-y-1">
+                                      <li>Go to <a href="https://console.firebase.google.com" target="_blank" className="underline text-blue-600 font-bold">Firebase Console</a></li>
+                                      <li>Select project: <b>localtournamentmanagment</b></li>
+                                      <li>Go to <b>Authentication</b> {'>'} <b>Sign-in method</b></li>
+                                      <li>Click <b>Google</b> and turn <b>Enable</b> switch ON.</li>
+                                      <li>Click <b>Save</b>.</li>
+                                  </ol>
+                              </div>
+                          ) : authError.type === 'domain' ? (
+                              <div className="ml-6 text-xs text-slate-700 space-y-2">
+                                  <p>Netlify বা আপনার কাস্টম ডোমেইনটি Firebase এ অ্যাড করা নেই।</p>
+                                  <ol className="list-decimal pl-4 space-y-1">
+                                      <li>Go to <a href="https://console.firebase.google.com" target="_blank" className="underline text-blue-600 font-bold">Firebase Console</a></li>
+                                      <li>Select <b>Authentication</b> {'>'} <b>Settings</b> {'>'} <b>Authorized domains</b></li>
+                                      <li>Click <b>Add domain</b>.</li>
+                                      <li>Paste your site domain (e.g. <code>myapp.netlify.app</code>).</li>
+                                  </ol>
+                              </div>
+                          ) : (
+                              <p className="ml-6">{authError.message}</p>
+                          )}
                       </div>
                   )}
 
@@ -114,7 +148,7 @@ export const AdminHome: React.FC = () => {
                   </button>
                   
                   <div className="text-center text-xs text-slate-400 mt-4">
-                      Create and manage your local tournaments easily.
+                      Create and manage your local cricket tournaments.
                   </div>
               </div>
           </div>
