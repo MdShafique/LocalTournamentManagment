@@ -27,6 +27,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
   // Advanced Wicket State
   const [wicketType, setWicketType] = useState<WicketType>('NONE');
   const [whoOut, setWhoOut] = useState<WhoOut>('STRIKER');
+  const [fielderId, setFielderId] = useState<string>(''); // New State for Fielder
 
   // Determine batting team players based on active innings
   const battingTeam = activeInnings === 'A' ? teamA : teamB;
@@ -170,6 +171,12 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
           return;
       }
 
+      // Check if Fielder is selected for Caught
+      if (wicketType === 'CAUGHT' && !fielderId) {
+          alert("Please select which fielder took the catch.");
+          return;
+      }
+
       setIsUpdating(true);
 
       try {
@@ -234,9 +241,13 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             // Generate Dismissal Text
             const bowlerName = getBowlingStats(bowlerId, targetBowlingList, bowlingTeam).playerName;
             let dismissalText = "";
+            
             switch (wicketType) {
                 case 'BOWLED': dismissalText = `b ${bowlerName}`; break;
-                case 'CAUGHT': dismissalText = `c Fielder b ${bowlerName}`; break; // Could add fielder name later
+                case 'CAUGHT': 
+                    const fielderName = bowlingTeam.players?.find(p => p.id === fielderId)?.name || 'Fielder';
+                    dismissalText = `c ${fielderName} b ${bowlerName}`; 
+                    break;
                 case 'LBW': dismissalText = `lbw b ${bowlerName}`; break;
                 case 'STUMPED': dismissalText = `st Keeper b ${bowlerName}`; break;
                 case 'HIT_WICKET': dismissalText = `hit wkt b ${bowlerName}`; break;
@@ -344,6 +355,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         setExtraType('NONE');
         setWicketType('NONE'); // Reset wicket
         setWhoOut('STRIKER'); // Reset who out
+        setFielderId(''); // Reset fielder
         
         setStrikerId(nextStriker);
         setNonStrikerId(nextNonStriker);
@@ -559,13 +571,30 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                                 <span className="text-sm font-bold text-red-700 bg-red-100 px-3 py-1 rounded border border-red-200">
                                     {wicketType.replace('_', ' ')}
                                 </span>
-                                <button onClick={() => { setWicketType('NONE'); setWhoOut('STRIKER'); }} className="p-1 hover:bg-red-200 rounded-full text-red-600">
+                                <button onClick={() => { setWicketType('NONE'); setWhoOut('STRIKER'); setFielderId(''); }} className="p-1 hover:bg-red-200 rounded-full text-red-600">
                                     <XCircle size={16}/>
                                 </button>
                             </div>
                         )}
                     </div>
                     
+                    {/* Caught Details */}
+                    {wicketType === 'CAUGHT' && (
+                       <div className="flex justify-center gap-4 animate-fade-in-down bg-blue-50 p-2 rounded border border-blue-100">
+                           <span className="text-xs font-bold text-blue-600 self-center">CAUGHT BY:</span>
+                           <select 
+                               className="border-blue-300 border rounded px-2 py-1 text-xs"
+                               value={fielderId}
+                               onChange={(e) => setFielderId(e.target.value)}
+                           >
+                               <option value="">Select Fielder...</option>
+                               {bowlingTeam.players?.map(p => (
+                                   <option key={p.id} value={p.id}>{p.name}</option>
+                               ))}
+                           </select>
+                       </div>
+                    )}
+
                     {/* Run Out Details */}
                     {wicketType === 'RUN_OUT' && (
                         <div className="flex justify-center gap-4 animate-fade-in-down bg-red-50 p-2 rounded border border-red-100">
