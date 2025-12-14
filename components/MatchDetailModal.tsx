@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Match, Team, TeamScorecard } from '../types';
 import { X, Calendar, MapPin } from 'lucide-react';
@@ -33,11 +34,18 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                       {scorecard?.batting.map((p) => (
-                          <tr key={p.playerId} className={p.isOut ? 'text-slate-400' : 'text-slate-800 font-medium'}>
+                          <tr key={p.playerId} className={p.isOut ? 'text-slate-500' : 'text-slate-900 font-bold bg-emerald-50/30'}>
                               <td className="px-4 py-2">
-                                  {p.playerName}
-                                  {p.isOut && <span className="text-red-400 text-xs ml-2 font-normal">(out)</span>}
-                                  {!p.isOut && match.status !== 'COMPLETED' && <span className="text-emerald-500 text-xs ml-2">*</span>}
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                                      <span>{p.playerName}</span>
+                                      {p.isOut ? (
+                                          <span className="text-red-500 text-xs font-normal italic">
+                                              {p.dismissal ? `(${p.dismissal})` : '(out)'}
+                                          </span>
+                                      ) : (
+                                          match.status !== 'COMPLETED' && <span className="text-emerald-600 text-xs font-bold">*</span>
+                                      )}
+                                  </div>
                               </td>
                               <td className="px-2 py-2 text-center font-bold">{p.runs}</td>
                               <td className="px-2 py-2 text-center">{p.balls}</td>
