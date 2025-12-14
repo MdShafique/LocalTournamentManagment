@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player } from '../types';
 import { calculateOvers } from '../services/storageService';
 import { generateAICommentary } from '../services/geminiService';
-import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand } from 'lucide-react';
+import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle } from 'lucide-react';
 
 interface Props {
   match: Match;
@@ -14,6 +14,8 @@ interface Props {
 }
 
 type ExtraType = 'NONE' | 'WIDE' | 'NO_BALL' | 'LEG_BYE' | 'BYE';
+type WicketType = 'NONE' | 'BOWLED' | 'CAUGHT' | 'LBW' | 'STUMPED' | 'RUN_OUT' | 'HIT_WICKET';
+type WhoOut = 'STRIKER' | 'NON_STRIKER';
 
 export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpdate, onDelete }) => {
   const [activeInnings, setActiveInnings] = useState<'A' | 'B'>('A');
@@ -21,7 +23,10 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
   // Scoring State
   const [extraType, setExtraType] = useState<ExtraType>('NONE');
-  const [isWicket, setIsWicket] = useState(false);
+  
+  // Advanced Wicket State
+  const [wicketType, setWicketType] = useState<WicketType>('NONE');
+  const [whoOut, setWhoOut] = useState<WhoOut>('STRIKER');
 
   // Determine batting team players based on active innings
   const battingTeam = activeInnings === 'A' ? teamA : teamB;
@@ -176,6 +181,8 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         const targetBattingList = activeInnings === 'A' ? updatedMatch.scorecard.A.batting : updatedMatch.scorecard.B.batting;
         const targetBowlingList = activeInnings === 'A' ? updatedMatch.scorecard.B.bowling : updatedMatch.scorecard.A.bowling;
 
+        const isWicket = wicketType !== 'NONE';
+
         // 1. CALCULATE VALUES
         let batsmanRuns = 0;
         let teamExtras = 0;
@@ -204,44 +211,66 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             bowlerRunsConceded = runVal;
         }
 
-        // 2. UPDATE BATSMAN STATS
-        const batsman = getBattingStats(strikerId, targetBattingList, battingTeam);
-        // Logic Fixed: WIDE doesn't count as ball faced, but NO_BALL DOES count as ball faced for batsman
+        // 2. UPDATE BATSMAN STATS (The Striker Always faces the ball unless it's a Wide)
+        const striker = getBattingStats(strikerId, targetBattingList, battingTeam);
+        
+        // Count ball faced: YES for legal deliveries and NO BALLS. NO for WIDES.
         if (extraType !== 'WIDE') {
-            batsman.balls += 1; 
+            striker.balls += 1;
         }
         
-        batsman.runs += batsmanRuns;
-        if (batsmanRuns === 4) batsman.fours += 1;
-        if (batsmanRuns === 6) batsman.sixes += 1;
+        striker.runs += batsmanRuns;
+        if (batsmanRuns === 4) striker.fours += 1;
+        if (batsmanRuns === 6) striker.sixes += 1;
         
+        // 3. HANDLE DISMISSAL
         if (isWicket) {
-            batsman.isOut = true;
-            batsman.dismissal = extraType === 'NONE' ? 'b ' + getBowlingStats(bowlerId, targetBowlingList, bowlingTeam).playerName : 'Run Out';
+            // Determine who is out
+            const dismissedPlayerId = (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') ? nonStrikerId : strikerId;
+            const dismissedPlayerStats = getBattingStats(dismissedPlayerId, targetBattingList, battingTeam);
+            
+            dismissedPlayerStats.isOut = true;
+            
+            // Generate Dismissal Text
+            const bowlerName = getBowlingStats(bowlerId, targetBowlingList, bowlingTeam).playerName;
+            let dismissalText = "";
+            switch (wicketType) {
+                case 'BOWLED': dismissalText = `b ${bowlerName}`; break;
+                case 'CAUGHT': dismissalText = `c Fielder b ${bowlerName}`; break; // Could add fielder name later
+                case 'LBW': dismissalText = `lbw b ${bowlerName}`; break;
+                case 'STUMPED': dismissalText = `st Keeper b ${bowlerName}`; break;
+                case 'HIT_WICKET': dismissalText = `hit wkt b ${bowlerName}`; break;
+                case 'RUN_OUT': dismissalText = `run out`; break;
+                default: dismissalText = `out`;
+            }
+            dismissedPlayerStats.dismissal = dismissalText;
         }
 
-        // 3. UPDATE BOWLER STATS
+        // 4. UPDATE BOWLER STATS
         const bowler = getBowlingStats(bowlerId, targetBowlingList, bowlingTeam);
         if (validBallCount === 1) {
             bowler.ballsBowled += 1;
         }
         bowler.runsConceded += bowlerRunsConceded;
-        if (isWicket && extraType !== 'WIDE' && extraType !== 'NO_BALL') {
+        
+        // Bowler gets credit for wicket EXCEPT Run Out
+        if (isWicket && wicketType !== 'RUN_OUT') {
              bowler.wickets += 1; 
         }
         bowler.overs = calculateOvers(bowler.ballsBowled);
 
-        // 4. UPDATE TEAM SCORE
+        // 5. UPDATE TEAM SCORE
         targetScore.runs += batsmanRuns + teamExtras;
         if (isWicket) targetScore.wickets += 1;
         targetScore.balls += validBallCount;
         targetScore.overs = calculateOvers(targetScore.balls);
 
-        // 5. STRIKE ROTATION & END OF OVER LOGIC
+        // 6. STRIKE ROTATION & END OF OVER LOGIC
         let nextStriker = strikerId;
         let nextNonStriker = nonStrikerId;
         let nextBowler = bowlerId;
 
+        // Run rotation
         if (runVal % 2 !== 0) {
             const temp = nextStriker;
             nextStriker = nextNonStriker;
@@ -256,11 +285,21 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             nextBowler = ''; 
         }
 
+        // Wicket Logic for Next Batsman
         if (isWicket) {
-            nextStriker = ''; 
+            if (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') {
+                // Non-Striker is out. Striker stays (unless crossed, but assuming standard flow here for simplicity)
+                nextNonStriker = ''; 
+                // Note: If they crossed, user would have entered runVal as 1, so Swap logic above already happened.
+            } else {
+                // Striker is out
+                nextStriker = '';
+                // Note: In new rules, new batter comes to strike usually, unless it was a run out.
+                // We leave the empty slot at Striker position.
+            }
         }
 
-        // 6. AUTO-COMPLETE CHECKS
+        // 7. AUTO-COMPLETE CHECKS
         let autoWinnerId: string | undefined = undefined;
         let autoStatus = match.status;
 
@@ -301,8 +340,11 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             delete updatedMatch.winnerId;
         }
 
+        // Reset local states
         setExtraType('NONE');
-        setIsWicket(false);
+        setWicketType('NONE'); // Reset wicket
+        setWhoOut('STRIKER'); // Reset who out
+        
         setStrikerId(nextStriker);
         setNonStrikerId(nextNonStriker);
         setBowlerId(nextBowler);
@@ -344,6 +386,15 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
   const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared);
   const canSwapTeams = match.scoreA.balls === 0 && match.scoreA.runs === 0 && match.status !== MatchStatus.COMPLETED;
+
+  const wicketOptions: {type: WicketType, label: string}[] = [
+      { type: 'BOWLED', label: 'Bowled' },
+      { type: 'CAUGHT', label: 'Caught' },
+      { type: 'LBW', label: 'LBW' },
+      { type: 'RUN_OUT', label: 'Run Out' },
+      { type: 'STUMPED', label: 'Stumped' },
+      { type: 'HIT_WICKET', label: 'Hit Wicket' },
+  ];
 
   return (
     <div className={`bg-white rounded-lg shadow-lg p-6 border border-slate-200 relative ${isUpdating ? 'opacity-80' : ''}`}>
@@ -464,24 +515,80 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                     </div>
                 </div>
 
-                <div className="flex flex-wrap justify-center gap-2 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    {['NONE', 'WIDE', 'NO_BALL', 'LEG_BYE', 'BYE'].map((type) => (
-                        <button
-                            key={type}
-                            onClick={() => setExtraType(type as ExtraType)}
-                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${extraType === type ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border hover:bg-slate-100'}`}
-                        >
-                            {type.replace('_', ' ')}
-                        </button>
-                    ))}
-                    <button
-                        onClick={() => setIsWicket(!isWicket)}
-                        className={`px-3 py-1 rounded text-xs font-bold transition-colors border ${isWicket ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}`}
-                    >
-                        WICKET
-                    </button>
+                {/* Extras & Wicket Selector */}
+                <div className="flex flex-col gap-4 mb-4">
+                     <div className="flex flex-wrap justify-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        <span className="text-xs font-bold text-slate-400 self-center uppercase mr-2">Extras:</span>
+                        {['NONE', 'WIDE', 'NO_BALL', 'LEG_BYE', 'BYE'].map((type) => (
+                            <button
+                                key={type}
+                                onClick={() => setExtraType(type as ExtraType)}
+                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${extraType === type ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border hover:bg-slate-100'}`}
+                            >
+                                {type.replace('_', ' ')}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className={`flex flex-wrap justify-center gap-2 p-2 rounded-lg border transition-colors ${wicketType !== 'NONE' ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                        <span className="text-xs font-bold text-red-400 self-center uppercase mr-2">Wicket:</span>
+                         
+                        {wicketType === 'NONE' ? (
+                            <div className="relative group">
+                                <button className="px-4 py-1 rounded text-xs font-bold bg-white text-red-500 border border-red-200 hover:bg-red-50 flex items-center gap-1">
+                                    <XCircle size={14}/> NO WICKET
+                                </button>
+                                {/* Hover Menu for Wicket Selection */}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-slate-200 shadow-xl rounded-lg p-2 w-48 hidden group-hover:block z-20">
+                                    <p className="text-xs font-bold text-slate-400 mb-2 px-2">Select Type:</p>
+                                    <div className="grid grid-cols-1 gap-1">
+                                        {wicketOptions.map(opt => (
+                                            <button 
+                                                key={opt.type}
+                                                onClick={() => setWicketType(opt.type)}
+                                                className="text-left px-2 py-1.5 text-sm hover:bg-slate-100 rounded text-slate-700"
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-red-700 bg-red-100 px-3 py-1 rounded border border-red-200">
+                                    {wicketType.replace('_', ' ')}
+                                </span>
+                                <button onClick={() => { setWicketType('NONE'); setWhoOut('STRIKER'); }} className="p-1 hover:bg-red-200 rounded-full text-red-600">
+                                    <XCircle size={16}/>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Run Out Details */}
+                    {wicketType === 'RUN_OUT' && (
+                        <div className="flex justify-center gap-4 animate-fade-in-down bg-red-50 p-2 rounded border border-red-100">
+                            <span className="text-xs font-bold text-red-600 self-center">WHO IS OUT?</span>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => setWhoOut('STRIKER')}
+                                    className={`px-3 py-1 rounded text-xs font-bold border ${whoOut === 'STRIKER' ? 'bg-red-600 text-white border-red-700' : 'bg-white text-red-600 border-red-200'}`}
+                                >
+                                    STRIKER
+                                </button>
+                                <button 
+                                    onClick={() => setWhoOut('NON_STRIKER')}
+                                    className={`px-3 py-1 rounded text-xs font-bold border ${whoOut === 'NON_STRIKER' ? 'bg-red-600 text-white border-red-700' : 'bg-white text-red-600 border-red-200'}`}
+                                >
+                                    NON-STRIKER
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
+                {/* Score Buttons */}
                 <div className="grid grid-cols-4 sm:grid-cols-7 gap-3 max-w-2xl mx-auto mb-6">
                     {[0, 1, 2, 3, 4, 6].map((run) => (
                         <button
@@ -501,7 +608,12 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                 <div className="text-center text-xs text-slate-400 mb-4 h-6">
                     {extraType === 'WIDE' && `Wide + Selected Runs (No Ball Count)`}
                     {extraType === 'NO_BALL' && `No Ball + Batsman Runs (No Ball Count)`}
-                    {isWicket && <span className="text-red-500 font-bold">Wicket will be recorded!</span>}
+                    {wicketType !== 'NONE' && (
+                         <span className="text-red-500 font-bold">
+                             {wicketType.replace('_', ' ')} will be recorded! 
+                             {wicketType === 'RUN_OUT' ? ` (${whoOut === 'STRIKER' ? 'Striker' : 'Non-Striker'})` : ''}
+                         </span>
+                    )}
                 </div>
 
             </div>
