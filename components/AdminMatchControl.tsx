@@ -206,9 +206,9 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
         // 2. UPDATE BATSMAN STATS
         const batsman = getBattingStats(strikerId, targetBattingList, battingTeam);
+        // Logic Fixed: WIDE doesn't count as ball faced, but NO_BALL DOES count as ball faced for batsman
         if (extraType !== 'WIDE') {
             batsman.balls += 1; 
-            if (extraType === 'NO_BALL') batsman.balls -= 1; 
         }
         
         batsman.runs += batsmanRuns;
