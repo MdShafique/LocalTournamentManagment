@@ -1,7 +1,7 @@
 
-import React from 'react';
-import { Match, Team, TeamScorecard } from '../types';
-import { X, Calendar, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Match, Team, TeamScorecard, MatchStatus } from '../types';
+import { X, Calendar, MapPin, Clock } from 'lucide-react';
 
 interface Props {
   match: Match;
@@ -11,7 +11,44 @@ interface Props {
 }
 
 export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose }) => {
-  
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  // Timer Logic
+  useEffect(() => {
+    if (match.status !== MatchStatus.SCHEDULED) return;
+
+    const calculateTimeLeft = () => {
+      // Create date object from match date and time inputs
+      const matchStart = new Date(`${match.date}T${match.time}`);
+      const now = new Date();
+      const difference = matchStart.getTime() - now.getTime();
+
+      if (difference > 0) {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((difference / 1000 / 60) % 60);
+        const seconds = Math.floor((difference / 1000) % 60);
+
+        if (days > 0) {
+            return `${days}d ${hours}h ${minutes}m`;
+        }
+        return `${hours}h ${minutes}m ${seconds}s`;
+      } else {
+        return "Starting Soon";
+      }
+    };
+
+    // Update immediately
+    setTimeLeft(calculateTimeLeft());
+
+    // Update every second
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [match]);
+
   const ScorecardTable = ({ battingTeam, bowlingTeam, scorecard, score, overs }: { battingTeam: Team, bowlingTeam: Team, scorecard?: TeamScorecard, score: any, overs: number }) => (
       <div className="mb-6">
           <div className="bg-slate-100 p-3 rounded-t-lg flex justify-between items-center border-b border-slate-200">
@@ -139,12 +176,16 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-50/50">
-            {/* Result Header */}
+            {/* Result / Status Header */}
             <div className="text-center mb-6">
-                 {match.status === 'COMPLETED' && match.winnerId ? (
+                 {match.status === MatchStatus.COMPLETED && match.winnerId ? (
                      <span className="inline-block px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm border border-emerald-200">
                          Winner: {match.winnerId === teamA.id ? teamA.name : teamB.name}
                      </span>
+                 ) : match.status === MatchStatus.SCHEDULED ? (
+                    <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-blue-800 font-bold text-xs sm:text-sm border border-blue-200">
+                        <Clock size={16} /> Live In: {timeLeft}
+                    </span>
                  ) : (
                      <span className="inline-block px-4 py-1.5 rounded-full bg-red-100 text-red-800 font-bold text-xs sm:text-sm animate-pulse border border-red-200">
                          ● LIVE MATCH
