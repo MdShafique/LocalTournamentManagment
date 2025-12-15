@@ -16,7 +16,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
       <div className="mb-6">
           <div className="bg-slate-100 p-3 rounded-t-lg flex justify-between items-center border-b border-slate-200">
               <div className="flex items-center gap-3">
-                  {battingTeam.logo ? <img src={battingTeam.logo} className="w-8 h-8 rounded-full object-cover border"/> : <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-slate-500 border">{battingTeam.shortName[0]}</div>}
+                  {battingTeam.logo ? <img src={battingTeam.logo} className="w-8 h-8 rounded-full object-cover border"/> : <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-slate-500 border">{battingTeam.name[0]}</div>}
                   <h4 className="font-bold text-slate-800 text-sm sm:text-base">{battingTeam.name} Innings</h4>
               </div>
               <div className="text-sm font-bold text-emerald-800">
@@ -126,7 +126,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
         <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 sm:rounded-t-xl shrink-0">
            <div>
                <h3 className="font-bold text-base sm:text-lg text-slate-800 flex flex-col sm:block">
-                   <span>{teamA.shortName} vs {teamB.shortName}</span>
+                   <span>{teamA.name} vs {teamB.name}</span>
                </h3>
                <p className="text-[10px] sm:text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                    <Calendar size={12}/> {new Date(match.date).toLocaleDateString()}

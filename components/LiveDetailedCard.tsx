@@ -99,7 +99,7 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
                      <img src={battingTeam.logo} alt={battingTeam.shortName} className="w-16 h-16 rounded-full object-cover border border-slate-200 mb-1"/>
                  ) : (
                     <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-2xl font-bold text-slate-300 mb-1 border border-slate-200">
-                        {battingTeam.shortName[0]}
+                        {battingTeam.name[0]}
                     </div>
                  )}
                  <span className="text-xs text-slate-400 font-medium">Batting</span>
@@ -173,7 +173,7 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
         <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between text-xs sm:text-sm text-slate-600">
              <div>CRR: <span className="font-bold text-slate-900">{score.overs > 0 ? (score.runs / score.overs).toFixed(2) : '0.00'}</span></div>
              {/* Mobile-only batting indicator instead of the large icon */}
-             <div className="sm:hidden font-bold text-slate-400">{battingTeam.shortName} Batting</div>
+             <div className="sm:hidden font-bold text-slate-400">{battingTeam.name} Batting</div>
         </div>
       </div>
     </div>

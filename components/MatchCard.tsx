@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Match, Team, MatchStatus } from '../types';
 import { Calendar, MapPin, Clock } from 'lucide-react';
@@ -42,11 +43,11 @@ export const MatchCard: React.FC<Props> = ({ match, teamA, teamB, onClick, isAdm
 
         {/* Teams & Scores */}
         <div className="flex justify-between items-center gap-4">
-          <div className="flex-1 text-center">
-             <div className="w-12 h-12 bg-slate-100 rounded-full mx-auto mb-2 flex items-center justify-center text-xl font-bold text-slate-400">
-                {teamA.logo ? <img src={teamA.logo} alt={teamA.name} className="w-full h-full rounded-full object-cover"/> : teamA.shortName[0]}
+          <div className="flex-1 text-center overflow-hidden">
+             <div className="w-12 h-12 bg-slate-100 rounded-full mx-auto mb-2 flex items-center justify-center text-xl font-bold text-slate-400 shrink-0">
+                {teamA.logo ? <img src={teamA.logo} alt={teamA.name} className="w-full h-full rounded-full object-cover"/> : teamA.name[0]}
              </div>
-             <h3 className="font-bold text-slate-900 truncate">{teamA.shortName}</h3>
+             <h3 className="font-bold text-slate-900 truncate px-1" title={teamA.name}>{teamA.name}</h3>
              {match.status !== MatchStatus.SCHEDULED && (
                  <p className="text-lg font-mono font-bold text-emerald-800">
                     {match.scoreA.runs}/{match.scoreA.wickets} <span className="text-xs text-slate-500">({match.scoreA.overs})</span>
@@ -54,13 +55,13 @@ export const MatchCard: React.FC<Props> = ({ match, teamA, teamB, onClick, isAdm
              )}
           </div>
 
-          <div className="text-center font-bold text-slate-300 text-xl">VS</div>
+          <div className="text-center font-bold text-slate-300 text-xl shrink-0">VS</div>
 
-          <div className="flex-1 text-center">
-             <div className="w-12 h-12 bg-slate-100 rounded-full mx-auto mb-2 flex items-center justify-center text-xl font-bold text-slate-400">
-                {teamB.logo ? <img src={teamB.logo} alt={teamB.name} className="w-full h-full rounded-full object-cover"/> : teamB.shortName[0]}
+          <div className="flex-1 text-center overflow-hidden">
+             <div className="w-12 h-12 bg-slate-100 rounded-full mx-auto mb-2 flex items-center justify-center text-xl font-bold text-slate-400 shrink-0">
+                {teamB.logo ? <img src={teamB.logo} alt={teamB.name} className="w-full h-full rounded-full object-cover"/> : teamB.name[0]}
              </div>
-             <h3 className="font-bold text-slate-900 truncate">{teamB.shortName}</h3>
+             <h3 className="font-bold text-slate-900 truncate px-1" title={teamB.name}>{teamB.name}</h3>
              {match.status !== MatchStatus.SCHEDULED && (
                  <p className="text-lg font-mono font-bold text-emerald-800">
                     {match.scoreB.runs}/{match.scoreB.wickets} <span className="text-xs text-slate-500">({match.scoreB.overs})</span>
@@ -75,7 +76,7 @@ export const MatchCard: React.FC<Props> = ({ match, teamA, teamB, onClick, isAdm
                  <MapPin size={12} /> {match.venue}
              </div>
              {match.status === MatchStatus.COMPLETED && match.winnerId ? (
-                 <span className="font-bold text-emerald-600">
+                 <span className="font-bold text-emerald-600 truncate max-w-[120px]">
                      Winner: {match.winnerId === teamA.id ? teamA.name : teamB.name}
                  </span>
              ) : (
