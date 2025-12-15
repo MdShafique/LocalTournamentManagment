@@ -6,7 +6,7 @@ import { PublicView } from './pages/PublicView';
 
 const Landing: React.FC = () => (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-4">
-        <h1 className="text-5xl font-bold mb-4 text-center text-emerald-400">CricManage Pro</h1>
+        <h1 className="text-5xl font-bold mb-4 text-center text-emerald-400">BKPL Cricket Tournament 2025/26</h1>
         <p className="text-xl text-slate-400 mb-8 max-w-lg text-center">The ultimate local cricket tournament management system.</p>
         <div className="flex gap-4">
             <a href="#/admin" className="bg-emerald-600 px-6 py-3 rounded-lg font-bold hover:bg-emerald-500 transition">Admin Login</a>

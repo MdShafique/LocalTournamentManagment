@@ -101,7 +101,7 @@ export const AdminHome: React.FC = () => {
           <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
               <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
                   <div className="text-center mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">CricManage Pro</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">BKPL Cricket Tournament</h1>
                     <p className="text-slate-500">Admin Portal Access</p>
                   </div>
                   

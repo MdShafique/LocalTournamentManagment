@@ -12,10 +12,13 @@ interface Props {
 
 export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose }) => {
   
-  const ScorecardTable = ({ teamName, scorecard, score, overs }: { teamName: string, scorecard?: TeamScorecard, score: any, overs: number }) => (
+  const ScorecardTable = ({ battingTeam, bowlingTeam, scorecard, score, overs }: { battingTeam: Team, bowlingTeam: Team, scorecard?: TeamScorecard, score: any, overs: number }) => (
       <div className="mb-6">
           <div className="bg-slate-100 p-3 rounded-t-lg flex justify-between items-center border-b border-slate-200">
-              <h4 className="font-bold text-slate-800 text-sm sm:text-base">{teamName} Innings</h4>
+              <div className="flex items-center gap-3">
+                  {battingTeam.logo ? <img src={battingTeam.logo} className="w-8 h-8 rounded-full object-cover border"/> : <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-slate-500 border">{battingTeam.shortName[0]}</div>}
+                  <h4 className="font-bold text-slate-800 text-sm sm:text-base">{battingTeam.name} Innings</h4>
+              </div>
               <div className="text-sm font-bold text-emerald-800">
                   {score.runs}/{score.wickets} <span className="text-slate-500 text-xs">({score.overs} ov)</span>
               </div>
@@ -34,18 +37,29 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {scorecard?.batting.map((p) => (
+                        {scorecard?.batting.map((p) => {
+                            const player = battingTeam.players?.find(pl => pl.id === p.playerId);
+                            return (
                             <tr key={p.playerId} className={p.isOut ? 'text-slate-500' : 'text-slate-900 font-bold bg-emerald-50/30'}>
                                 <td className="px-3 py-2">
-                                    <div className="flex flex-col">
-                                        <span className="truncate max-w-[120px] sm:max-w-none">{p.playerName}</span>
-                                        {p.isOut ? (
-                                            <span className="text-red-500 text-[10px] sm:text-xs font-normal italic truncate max-w-[120px]">
-                                                {p.dismissal ? p.dismissal : 'out'}
-                                            </span>
+                                    <div className="flex items-center gap-2">
+                                        {player?.image ? (
+                                            <img src={player.image} className="w-8 h-8 rounded-full object-cover border border-slate-100 shrink-0" alt="" />
                                         ) : (
-                                            match.status !== 'COMPLETED' && <span className="text-emerald-600 text-[10px] sm:text-xs font-bold">not out</span>
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
+                                                {p.playerName[0]}
+                                            </div>
                                         )}
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="truncate max-w-[100px] sm:max-w-none">{p.playerName}</span>
+                                            {p.isOut ? (
+                                                <span className="text-red-500 text-[10px] sm:text-xs font-normal italic truncate max-w-[100px]">
+                                                    {p.dismissal ? p.dismissal : 'out'}
+                                                </span>
+                                            ) : (
+                                                match.status !== 'COMPLETED' && <span className="text-emerald-600 text-[10px] sm:text-xs font-bold">not out</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </td>
                                 <td className="px-2 py-2 text-center font-bold">{p.runs}</td>
@@ -56,7 +70,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                                     {p.balls > 0 ? ((p.runs / p.balls) * 100).toFixed(0) : '0'}
                                 </td>
                             </tr>
-                        ))}
+                        )})}
                         {(!scorecard?.batting || scorecard.batting.length === 0) && (
                             <tr><td colSpan={6} className="text-center py-4 text-slate-400 italic">No batting data yet</td></tr>
                         )}
@@ -76,9 +90,20 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
               </div>
               <div className="divide-y divide-slate-100 overflow-x-auto">
                   <div className="min-w-[350px]">
-                    {scorecard?.bowling.map((b) => (
-                        <div key={b.playerId} className="flex px-3 py-2 text-xs sm:text-sm">
-                            <span className="flex-1 font-medium truncate">{b.playerName}</span>
+                    {scorecard?.bowling.map((b) => {
+                        const bowler = bowlingTeam.players?.find(pl => pl.id === b.playerId);
+                        return (
+                        <div key={b.playerId} className="flex items-center px-3 py-2 text-xs sm:text-sm">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                {bowler?.image ? (
+                                    <img src={bowler.image} className="w-6 h-6 rounded-full object-cover border border-slate-100 shrink-0" alt="" />
+                                ) : (
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
+                                        {b.playerName[0]}
+                                    </div>
+                                )}
+                                <span className="font-medium truncate">{b.playerName}</span>
+                            </div>
                             <span className="w-10 text-center">{b.overs}</span>
                             <span className="w-10 text-center text-slate-400">{b.maidens}</span>
                             <span className="w-10 text-center">{b.runsConceded}</span>
@@ -87,7 +112,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                                 {b.ballsBowled > 0 ? (b.runsConceded / (b.ballsBowled/6)).toFixed(1) : '-'}
                             </span>
                         </div>
-                    ))}
+                    )})}
                   </div>
               </div>
           </div>
@@ -128,8 +153,8 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pb-10">
-                <ScorecardTable teamName={teamA.name} scorecard={match.scorecard?.A} score={match.scoreA} overs={match.totalOvers} />
-                <ScorecardTable teamName={teamB.name} scorecard={match.scorecard?.B} score={match.scoreB} overs={match.totalOvers} />
+                <ScorecardTable battingTeam={teamA} bowlingTeam={teamB} scorecard={match.scorecard?.A} score={match.scoreA} overs={match.totalOvers} />
+                <ScorecardTable battingTeam={teamB} bowlingTeam={teamA} scorecard={match.scorecard?.B} score={match.scoreB} overs={match.totalOvers} />
             </div>
         </div>
       </div>

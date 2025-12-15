@@ -58,6 +58,13 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
       else equation = `Need ${runsNeeded} runs in ${ballsRem} balls`;
   }
 
+  // Helper to get image
+  const getPlayerImage = (playerId: string) => {
+      if (!playerId) return undefined;
+      const p = teamA.players?.find(pl => pl.id === playerId) || teamB.players?.find(pl => pl.id === playerId);
+      return p?.image;
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-6">
       {/* Header: Match Info */}
@@ -88,9 +95,13 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
             </div>
             
             <div className="hidden sm:flex flex-col items-center shrink-0">
-                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-2xl font-bold text-slate-300 mb-1 border border-slate-200">
-                     {battingTeam.shortName[0]}
-                 </div>
+                 {battingTeam.logo ? (
+                     <img src={battingTeam.logo} alt={battingTeam.shortName} className="w-16 h-16 rounded-full object-cover border border-slate-200 mb-1"/>
+                 ) : (
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-2xl font-bold text-slate-300 mb-1 border border-slate-200">
+                        {battingTeam.shortName[0]}
+                    </div>
+                 )}
                  <span className="text-xs text-slate-400 font-medium">Batting</span>
             </div>
         </div>
@@ -106,7 +117,11 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
                 </div>
                 <div className="px-4 py-3 border-b border-emerald-100/50 flex justify-between items-center">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="text-emerald-600 font-bold shrink-0">🏏</span>
+                        {getPlayerImage(details.strikerId) ? (
+                            <img src={getPlayerImage(details.strikerId)} className="w-6 h-6 rounded-full object-cover border border-emerald-200 shrink-0"/>
+                        ) : (
+                            <span className="text-emerald-600 font-bold shrink-0">🏏</span>
+                        )}
                         <span className="font-semibold text-slate-800 truncate">{details.strikerName || 'Striker'} *</span>
                     </div>
                     <div className="font-mono font-bold text-slate-900 w-20 text-right shrink-0">
@@ -115,7 +130,11 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
                 </div>
                 <div className="px-4 py-3 flex justify-between items-center">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="w-4 shrink-0"></span>
+                        {getPlayerImage(details.nonStrikerId) ? (
+                            <img src={getPlayerImage(details.nonStrikerId)} className="w-6 h-6 rounded-full object-cover border border-emerald-200 shrink-0"/>
+                        ) : (
+                            <span className="w-4 shrink-0"></span>
+                        )}
                         <span className="font-semibold text-slate-700 truncate">{details.nonStrikerName || 'Non-Striker'}</span>
                     </div>
                     <div className="font-mono font-bold text-slate-700 w-20 text-right shrink-0">
@@ -132,7 +151,11 @@ export const LiveDetailedCard: React.FC<Props> = ({ match, teamA, teamB }) => {
                 </div>
                 <div className="px-4 py-3 flex justify-between items-center">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="text-blue-600 font-bold shrink-0">⚾</span>
+                        {getPlayerImage(details.bowlerId) ? (
+                            <img src={getPlayerImage(details.bowlerId)} className="w-6 h-6 rounded-full object-cover border border-blue-200 shrink-0"/>
+                        ) : (
+                            <span className="text-blue-600 font-bold shrink-0">⚾</span>
+                        )}
                         <span className="font-semibold text-slate-800 truncate">{details.bowlerName || 'Bowler'}</span>
                     </div>
                     <div className="font-mono font-bold text-slate-900 w-24 text-right shrink-0">

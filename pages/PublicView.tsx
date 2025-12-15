@@ -97,12 +97,13 @@ export const PublicView: React.FC = () => {
 
   // Aggregate stats logic (same as before)
   const getAllBattingStats = () => {
-      const stats: Record<string, {name: string, runs: number, team: string}> = {};
+      const stats: Record<string, {name: string, runs: number, team: string, image?: string}> = {};
       matches.forEach(m => {
           [...m.scorecard.A.batting, ...m.scorecard.B.batting].forEach(p => {
               if(!stats[p.playerId]) {
                   const team = teams.find(t => t.players?.some(pl => pl.id === p.playerId));
-                  stats[p.playerId] = { name: p.playerName, runs: 0, team: team?.shortName || '' };
+                  const player = team?.players.find(pl => pl.id === p.playerId);
+                  stats[p.playerId] = { name: p.playerName, runs: 0, team: team?.shortName || '', image: player?.image };
               }
               stats[p.playerId].runs += p.runs;
           });
@@ -111,12 +112,13 @@ export const PublicView: React.FC = () => {
   };
   
   const getAllBowlingStats = () => {
-      const stats: Record<string, {name: string, wickets: number, team: string}> = {};
+      const stats: Record<string, {name: string, wickets: number, team: string, image?: string}> = {};
       matches.forEach(m => {
           [...m.scorecard.A.bowling, ...m.scorecard.B.bowling].forEach(p => {
                if(!stats[p.playerId]) {
                   const team = teams.find(t => t.players?.some(pl => pl.id === p.playerId));
-                  stats[p.playerId] = { name: p.playerName, wickets: 0, team: team?.shortName || '' };
+                  const player = team?.players.find(pl => pl.id === p.playerId);
+                  stats[p.playerId] = { name: p.playerName, wickets: 0, team: team?.shortName || '', image: player?.image };
               }
               stats[p.playerId].wickets += p.wickets;
           });
@@ -269,9 +271,13 @@ export const PublicView: React.FC = () => {
                           {team.players && team.players.length > 0 ? (
                               team.players.map(p => (
                                   <div key={p.id} className="flex items-center gap-2 text-sm">
-                                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                                          {p.name[0]}
-                                      </div>
+                                      {p.image ? (
+                                         <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-slate-200" alt={p.name[0]} />
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
+                                            {p.name[0]}
+                                        </div>
+                                      )}
                                       <div>
                                           <p className="font-medium">{p.name}</p>
                                           <p className="text-xs text-slate-400">{p.role}</p>
@@ -300,6 +306,7 @@ export const PublicView: React.FC = () => {
                           <div key={i} className="px-6 py-3 flex justify-between items-center">
                               <div className="flex items-center gap-3">
                                   <span className="font-bold text-slate-300">#{i+1}</span>
+                                  {p.image && <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-slate-100" />}
                                   <div>
                                       <p className="font-bold text-slate-800">{p.name}</p>
                                       <p className="text-xs text-slate-500">{p.team}</p>
@@ -322,6 +329,7 @@ export const PublicView: React.FC = () => {
                           <div key={i} className="px-6 py-3 flex justify-between items-center">
                               <div className="flex items-center gap-3">
                                   <span className="font-bold text-slate-300">#{i+1}</span>
+                                  {p.image && <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-slate-100" />}
                                   <div>
                                       <p className="font-bold text-slate-800">{p.name}</p>
                                       <p className="text-xs text-slate-500">{p.team}</p>
