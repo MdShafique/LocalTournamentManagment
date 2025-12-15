@@ -1,12 +1,13 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMatches, getTeams, getTournament, saveTeam, saveMatch, initializeMatch, deleteTeam, deleteMatch, addPlayerToTeam, deletePlayerFromTeam } from '../services/storageService';
+import { getMatches, getTeams, getTournament, saveTeam, saveMatch, initializeMatch, deleteTeam, deleteMatch, addPlayerToTeam, deletePlayerFromTeam, saveTournament, updatePlayerInTeam } from '../services/storageService';
 import { Match, Team, Tournament, Player } from '../types';
 import { Layout } from '../components/Layout';
 import { AdminMatchControl } from '../components/AdminMatchControl';
 import { MatchCard } from '../components/MatchCard';
 import { auth } from '../services/firebase'; // Import auth to check user
-import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock } from 'lucide-react';
+import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock, Edit2, Check, Image as ImageIcon } from 'lucide-react';
 
 export const TournamentAdmin: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +29,12 @@ export const TournamentAdmin: React.FC = () => {
   const [selectedTeamForSquad, setSelectedTeamForSquad] = useState<Team | null>(null);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerRole, setNewPlayerRole] = useState<Player['role']>('Batsman');
+  const [newPlayerImage, setNewPlayerImage] = useState('');
+
+  // Editing States
+  const [isEditingTournament, setIsEditingTournament] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
 
   // Scheduling State
   const [showScheduler, setShowScheduler] = useState(false);
@@ -73,6 +80,16 @@ export const TournamentAdmin: React.FC = () => {
     }
   };
 
+  // --- ACTIONS ---
+
+  const handleUpdateTournament = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!tournament) return;
+      await saveTournament(tournament);
+      setIsEditingTournament(false);
+      await refreshData();
+  };
+
   const handleAddTeam = async () => {
     if (!newTeamName.trim() || !id) return;
     const newTeam: Team = {
@@ -88,17 +105,34 @@ export const TournamentAdmin: React.FC = () => {
     await refreshData();
   };
 
+  const handleUpdateTeam = async () => {
+      if (!editingTeam) return;
+      await saveTeam(editingTeam);
+      setEditingTeam(null);
+      await refreshData();
+  };
+
   const handleAddPlayer = async () => {
       if (!selectedTeamForSquad || !newPlayerName.trim()) return;
-      await addPlayerToTeam(selectedTeamForSquad.id, newPlayerName, newPlayerRole);
+      await addPlayerToTeam(selectedTeamForSquad.id, newPlayerName, newPlayerRole, newPlayerImage);
       setNewPlayerName('');
+      setNewPlayerImage('');
+      await refreshData();
+  };
+
+  const handleUpdatePlayer = async () => {
+      if (!selectedTeamForSquad || !editingPlayer) return;
+      await updatePlayerInTeam(selectedTeamForSquad.id, editingPlayer);
+      setEditingPlayer(null);
       await refreshData();
   };
 
   const handleDeletePlayer = async (playerId: string) => {
       if (!selectedTeamForSquad) return;
-      await deletePlayerFromTeam(selectedTeamForSquad.id, playerId);
-      await refreshData();
+      if (window.confirm("Remove player from squad?")) {
+        await deletePlayerFromTeam(selectedTeamForSquad.id, playerId);
+        await refreshData();
+      }
   };
 
   const handleCreateMatch = async (e: React.FormEvent) => {
@@ -141,7 +175,7 @@ export const TournamentAdmin: React.FC = () => {
   };
 
   const handleDeleteTeam = async (tid: string) => {
-      if(window.confirm('Delete team?')) {
+      if(window.confirm('Delete team? This will NOT delete matches associated with it, but stats will break.')) {
           await deleteTeam(tid);
           await refreshData();
       }
@@ -170,14 +204,23 @@ export const TournamentAdmin: React.FC = () => {
 
   return (
     <Layout>
+      {/* Top Bar with Tournament Info & Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
            <button onClick={() => navigate('/admin')} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm mb-2">
                <ArrowLeft size={16}/> Back to Dashboard
            </button>
-           {tournament && (
-               <h1 className="text-2xl font-bold text-slate-900">{tournament.name} <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded">Admin</span></h1>
-           )}
+           
+           <div className="flex items-center gap-3">
+               {tournament.logo && (
+                   <img src={tournament.logo} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+               )}
+               <h1 className="text-2xl font-bold text-slate-900">{tournament.name}</h1>
+               <button onClick={() => setIsEditingTournament(true)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full">
+                   <Edit2 size={16}/>
+               </button>
+           </div>
+           <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">Admin Panel</span>
         </div>
         {tournament && (
             <button 
@@ -193,6 +236,42 @@ export const TournamentAdmin: React.FC = () => {
         )}
       </div>
 
+      {/* EDIT TOURNAMENT MODAL */}
+      {isEditingTournament && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md animate-fade-in-up">
+                  <h3 className="text-xl font-bold mb-4">Edit Tournament</h3>
+                  <form onSubmit={handleUpdateTournament} className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Tournament Name</label>
+                          <input 
+                              type="text" 
+                              value={tournament.name}
+                              onChange={e => setTournament({...tournament, name: e.target.value})}
+                              className="w-full border p-2 rounded"
+                              required
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Logo URL (Optional)</label>
+                          <input 
+                              type="text" 
+                              value={tournament.logo || ''}
+                              onChange={e => setTournament({...tournament, logo: e.target.value})}
+                              placeholder="https://..."
+                              className="w-full border p-2 rounded"
+                          />
+                      </div>
+                      <div className="flex gap-2 justify-end pt-2">
+                          <button type="button" onClick={() => setIsEditingTournament(false)} className="px-4 py-2 text-slate-600">Cancel</button>
+                          <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded font-bold">Save Changes</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Navigation Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-slate-200">
           {[
               { id: 'overview', label: 'Overview' },
@@ -230,19 +309,31 @@ export const TournamentAdmin: React.FC = () => {
       ) : selectedTeamForSquad ? (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-fade-in-up">
               <div className="flex justify-between items-center mb-6 border-b pb-4">
-                  <h3 className="font-bold text-lg">Manage Squad: {selectedTeamForSquad.name}</h3>
+                  <div className="flex items-center gap-3">
+                      {selectedTeamForSquad.logo && <img src={selectedTeamForSquad.logo} className="w-10 h-10 rounded-full object-cover"/>}
+                      <h3 className="font-bold text-lg">Manage Squad: {selectedTeamForSquad.name}</h3>
+                  </div>
                   <button onClick={() => setSelectedTeamForSquad(null)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
               </div>
               
-              <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <input 
-                      className="flex-1 border rounded-lg px-4 py-2" 
-                      placeholder="Player Name" 
-                      value={newPlayerName}
-                      onChange={(e) => setNewPlayerName(e.target.value)}
-                  />
+              {/* Add New Player Form */}
+              <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+                  <div className="flex-1 space-y-2">
+                      <input 
+                          className="w-full border rounded-lg px-4 py-2" 
+                          placeholder="Player Name" 
+                          value={newPlayerName}
+                          onChange={(e) => setNewPlayerName(e.target.value)}
+                      />
+                      <input 
+                          className="w-full border rounded-lg px-4 py-2 text-xs" 
+                          placeholder="Image URL (Optional)" 
+                          value={newPlayerImage}
+                          onChange={(e) => setNewPlayerImage(e.target.value)}
+                      />
+                  </div>
                   <select 
-                      className="border rounded-lg px-4 py-2 bg-white"
+                      className="border rounded-lg px-4 py-2 bg-white h-10"
                       value={newPlayerRole}
                       onChange={(e) => setNewPlayerRole(e.target.value as Player['role'])}
                   >
@@ -251,17 +342,48 @@ export const TournamentAdmin: React.FC = () => {
                       <option value="All-Rounder">All-Rounder</option>
                       <option value="WicketKeeper">WicketKeeper</option>
                   </select>
-                  <button onClick={handleAddPlayer} className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold">Add Player</button>
+                  <button onClick={handleAddPlayer} className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold h-10">Add</button>
               </div>
 
+              {/* Player List */}
               <div className="space-y-2">
                   {selectedTeamForSquad.players?.map(p => (
-                      <div key={p.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                          <div>
-                              <span className="font-bold text-slate-800">{p.name}</span>
-                              <span className="ml-2 text-xs text-slate-500 bg-white border px-2 py-0.5 rounded-full">{p.role}</span>
-                          </div>
-                          <button onClick={() => handleDeletePlayer(p.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                      <div key={p.id} className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-lg shadow-sm">
+                          {editingPlayer?.id === p.id ? (
+                              <div className="flex flex-col sm:flex-row gap-2 w-full items-center">
+                                  <input 
+                                    className="border p-1 rounded text-sm flex-1" 
+                                    value={editingPlayer.name} 
+                                    onChange={e => setEditingPlayer({...editingPlayer, name: e.target.value})}
+                                  />
+                                  <input 
+                                    className="border p-1 rounded text-sm flex-1" 
+                                    placeholder="Image URL"
+                                    value={editingPlayer.image || ''} 
+                                    onChange={e => setEditingPlayer({...editingPlayer, image: e.target.value})}
+                                  />
+                                  <button onClick={handleUpdatePlayer} className="p-1 bg-emerald-100 text-emerald-600 rounded"><Check size={16}/></button>
+                                  <button onClick={() => setEditingPlayer(null)} className="p-1 bg-slate-100 text-slate-500 rounded"><X size={16}/></button>
+                              </div>
+                          ) : (
+                              <>
+                                <div className="flex items-center gap-3">
+                                    {p.image ? (
+                                        <img src={p.image} className="w-8 h-8 rounded-full object-cover border" alt={p.name[0]} />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">{p.name[0]}</div>
+                                    )}
+                                    <div>
+                                        <span className="font-bold text-slate-800">{p.name}</span>
+                                        <span className="ml-2 text-[10px] text-slate-500 bg-slate-50 border px-2 py-0.5 rounded-full uppercase tracking-wider">{p.role}</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setEditingPlayer(p)} className="text-slate-400 hover:text-emerald-500"><Edit2 size={16}/></button>
+                                    <button onClick={() => handleDeletePlayer(p.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
+                                </div>
+                              </>
+                          )}
                       </div>
                   ))}
                   {(!selectedTeamForSquad.players || selectedTeamForSquad.players.length === 0) && (
@@ -296,6 +418,7 @@ export const TournamentAdmin: React.FC = () => {
 
             {view === 'teams' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Add Team Section */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h3 className="font-bold mb-4">Add New Team</h3>
                         <div className="flex flex-col gap-3">
@@ -324,24 +447,52 @@ export const TournamentAdmin: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Team List Section */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h3 className="font-bold mb-4">Team List</h3>
                         <div className="space-y-2">
                             {teams.map(t => (
                                 <div key={t.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg group">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-slate-200 text-slate-600 text-xs px-2 py-1 rounded font-bold">{t.group}</span>
-                                        <span className="font-medium">{t.name}</span>
-                                        <span className="text-xs text-slate-400">({t.players?.length || 0} players)</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setSelectedTeamForSquad(t)} className="text-xs bg-white border px-2 py-1 rounded text-emerald-600 hover:bg-emerald-50">
-                                            Manage Squad
-                                        </button>
-                                        <button onClick={() => handleDeleteTeam(t.id)} className="text-slate-300 hover:text-red-500">
-                                            <Trash2 size={16}/>
-                                        </button>
-                                    </div>
+                                    {editingTeam?.id === t.id ? (
+                                        <div className="flex flex-col gap-2 w-full">
+                                            <input 
+                                                className="border p-2 rounded text-sm w-full" 
+                                                value={editingTeam.name} 
+                                                onChange={e => setEditingTeam({...editingTeam, name: e.target.value})}
+                                                placeholder="Team Name"
+                                            />
+                                            <input 
+                                                className="border p-2 rounded text-sm w-full" 
+                                                value={editingTeam.logo || ''} 
+                                                onChange={e => setEditingTeam({...editingTeam, logo: e.target.value})}
+                                                placeholder="Logo URL"
+                                            />
+                                            <div className="flex gap-2">
+                                                <button onClick={handleUpdateTeam} className="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold">Save</button>
+                                                <button onClick={() => setEditingTeam(null)} className="bg-slate-300 text-slate-700 px-3 py-1 rounded text-xs">Cancel</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-slate-200 text-slate-600 text-xs px-2 py-1 rounded font-bold">{t.group}</span>
+                                                {t.logo && <img src={t.logo} alt="L" className="w-6 h-6 rounded-full object-cover"/>}
+                                                <span className="font-medium">{t.name}</span>
+                                                <span className="text-xs text-slate-400">({t.players?.length || 0})</span>
+                                            </div>
+                                            <div className="flex gap-2 items-center">
+                                                <button onClick={() => setSelectedTeamForSquad(t)} className="text-xs bg-white border px-2 py-1 rounded text-emerald-600 hover:bg-emerald-50">
+                                                    Squad
+                                                </button>
+                                                <button onClick={() => setEditingTeam(t)} className="text-slate-300 hover:text-blue-500">
+                                                    <Edit2 size={16}/>
+                                                </button>
+                                                <button onClick={() => handleDeleteTeam(t.id)} className="text-slate-300 hover:text-red-500">
+                                                    <Trash2 size={16}/>
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ))}
                             {teams.length === 0 && <p className="text-slate-400 italic text-sm">No teams added yet.</p>}

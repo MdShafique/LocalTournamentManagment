@@ -12,6 +12,7 @@ export interface Player {
   role: 'Batsman' | 'Bowler' | 'All-Rounder' | 'WicketKeeper';
   totalRuns: number;
   totalWickets: number;
+  image?: string; // New: Player Image URL
 }
 
 export interface Team {
@@ -29,7 +30,7 @@ export interface InningsScore {
   wickets: number;
   overs: number;
   balls: number;
-  isDeclared?: boolean; // New field to handle manual innings end
+  isDeclared?: boolean;
 }
 
 export interface BattingStats {
@@ -40,13 +41,13 @@ export interface BattingStats {
     fours: number;
     sixes: number;
     isOut: boolean;
-    dismissal?: string; // e.g. "b. BowlerX"
+    dismissal?: string;
 }
 
 export interface BowlingStats {
     playerId: string;
     playerName: string;
-    overs: number; // Stored as balls ideally, but using float x.y for display simplicity here or derived
+    overs: number;
     ballsBowled: number;
     runsConceded: number;
     wickets: number;
@@ -59,10 +60,9 @@ export interface TeamScorecard {
 }
 
 export interface LiveDetails {
-  strikerId: string; // ID mapping to scorecard
+  strikerId: string;
   nonStrikerId: string;
   bowlerId: string;
-  // Display names for quick UI access, though could be derived
   strikerName: string;
   nonStrikerName: string;
   bowlerName: string;
@@ -84,7 +84,6 @@ export interface Match {
   scoreA: InningsScore;
   scoreB: InningsScore;
   
-  // New: Detailed Stats per team
   scorecard: {
       A: TeamScorecard;
       B: TeamScorecard;
@@ -94,6 +93,7 @@ export interface Match {
   winnerId?: string;
   manOfTheMatch?: string;
   commentary?: string[];
+  history?: string[]; // New: Stores JSON stringified snapshots of previous states
 }
 
 export interface Tournament {

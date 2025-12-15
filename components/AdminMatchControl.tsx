@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player } from '../types';
 import { calculateOvers } from '../services/storageService';
 import { generateAICommentary } from '../services/geminiService';
-import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle } from 'lucide-react';
+import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle, RotateCcw } from 'lucide-react';
 
 interface Props {
   match: Match;
@@ -93,6 +93,30 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       return stats;
   };
 
+  const handleUndo = async () => {
+      if (!match.history || match.history.length === 0) return;
+      
+      const confirmUndo = window.confirm("Are you sure you want to UNDO the last action?");
+      if (!confirmUndo) return;
+
+      setIsUpdating(true);
+      try {
+          const historyCopy = [...match.history];
+          const previousStateJson = historyCopy.pop(); // Remove last state
+          
+          if (previousStateJson) {
+              const previousState = JSON.parse(previousStateJson);
+              // Ensure history array is preserved correctly
+              previousState.history = historyCopy; 
+              await onUpdate(previousState);
+          }
+      } catch (error) {
+          console.error("Undo failed", error);
+      } finally {
+          setIsUpdating(false);
+      }
+  };
+
   const handleManualEndInnings = async () => {
       const message = activeInnings === 'A' 
           ? "Are you sure you want to END the 1st Innings now?" 
@@ -104,6 +128,12 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       try {
           const updated = { ...match };
           
+          // Save History
+          if (!updated.history) updated.history = [];
+          const currentStateSnapshot = JSON.stringify({ ...match, history: undefined }); // Don't nest history inside history
+          updated.history.push(currentStateSnapshot);
+          if (updated.history.length > 50) updated.history.shift(); // Keep last 50
+
           if (activeInnings === 'A') {
               updated.scoreA.isDeclared = true;
               updated.liveDetails = {
@@ -183,6 +213,17 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         // Clone Match Data
         const updatedMatch = JSON.parse(JSON.stringify(match)) as Match;
         if(!updatedMatch.scorecard) updatedMatch.scorecard = { A: { batting:[], bowling:[] }, B: { batting:[], bowling:[] } };
+
+        // --- UNDO SYSTEM ---
+        if (!updatedMatch.history) updatedMatch.history = [];
+        // Snapshot logic: Save everything EXCEPT the history itself to avoid recursive bloating
+        const currentStateSnapshot = JSON.stringify({ ...match, history: undefined });
+        updatedMatch.history.push(currentStateSnapshot);
+        // Limit history size to prevent Firestore issues
+        if (updatedMatch.history.length > 50) {
+            updatedMatch.history.shift();
+        }
+        // -------------------
 
         const targetScore = activeInnings === 'A' ? updatedMatch.scoreA : updatedMatch.scoreB;
         const targetBattingList = activeInnings === 'A' ? updatedMatch.scorecard.A.batting : updatedMatch.scorecard.B.batting;
@@ -424,6 +465,18 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
              </p>
          </div>
          <div className="flex gap-2">
+            {/* UNDO BUTTON */}
+            {match.history && match.history.length > 0 && (
+                <button 
+                    onClick={handleUndo}
+                    disabled={isUpdating}
+                    className="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded flex items-center gap-2 text-sm font-bold border border-slate-200"
+                    title="Undo last action"
+                >
+                    <RotateCcw size={18} /> <span className="hidden sm:inline">Undo</span>
+                </button>
+            )}
+
             {match.status === MatchStatus.LIVE && (
                 <button 
                     onClick={handleManualEndInnings}

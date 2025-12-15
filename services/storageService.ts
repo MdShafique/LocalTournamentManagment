@@ -51,6 +51,9 @@ const repairMatchData = (match: Match): Match => {
             bowlerId: '', bowlerName: ''
         };
     }
+    if (!updated.history) {
+        updated.history = [];
+    }
     return updated;
 };
 
@@ -94,7 +97,7 @@ export const deleteTeam = async (id: string) => {
 };
 
 // Player Management
-export const addPlayerToTeam = async (teamId: string, name: string, role: Player['role']) => {
+export const addPlayerToTeam = async (teamId: string, name: string, role: Player['role'], image?: string) => {
     const teamRef = doc(db, TEAMS_COL, teamId);
     const teamSnap = await getDoc(teamRef);
     
@@ -105,10 +108,24 @@ export const addPlayerToTeam = async (teamId: string, name: string, role: Player
             name,
             role,
             totalRuns: 0,
-            totalWickets: 0
+            totalWickets: 0,
+            image: image || ''
         };
         const updatedPlayers = team.players ? [...team.players, newPlayer] : [newPlayer];
         await setDoc(teamRef, cleanForFirestore({ ...team, players: updatedPlayers }));
+    }
+};
+
+export const updatePlayerInTeam = async (teamId: string, player: Player) => {
+    const teamRef = doc(db, TEAMS_COL, teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (teamSnap.exists()) {
+        const team = teamSnap.data() as Team;
+        if (team.players) {
+            const updatedPlayers = team.players.map(p => p.id === player.id ? player : p);
+            await setDoc(teamRef, cleanForFirestore({ ...team, players: updatedPlayers }));
+        }
     }
 };
 
@@ -186,5 +203,6 @@ export const initializeMatch = (
       strikerId: '', strikerName: '',
       nonStrikerId: '', nonStrikerName: '',
       bowlerId: '', bowlerName: ''
-  }
+  },
+  history: []
 });
