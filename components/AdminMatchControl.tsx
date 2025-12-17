@@ -23,6 +23,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
   // Scoring State
   const [extraType, setExtraType] = useState<ExtraType>('NONE');
+  const [isOverthrow, setIsOverthrow] = useState(false); // New State for Overthrow
   
   // Advanced Wicket State
   const [wicketType, setWicketType] = useState<WicketType>('NONE');
@@ -231,32 +232,41 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
         const isWicket = wicketType !== 'NONE';
 
-        // 1. CALCULATE VALUES
+        // 1. CALCULATE VALUES WITH OVERTHROW
+        let effectiveRunVal = runVal;
+        if (isOverthrow) {
+            effectiveRunVal += 4; // Add boundary runs to the ran runs
+        }
+
         let batsmanRuns = 0;
         let teamExtras = 0;
         let validBallCount = 0;
         let bowlerRunsConceded = 0;
 
         if (extraType === 'WIDE') {
-            teamExtras = 1 + runVal; 
+            // Wide + Runs (ran + overthrow) are all extras in most standards, 
+            // BUT if it's off the bat it wouldn't be wide. 
+            // If it IS wide, then the runs are Wides.
+            teamExtras = 1 + effectiveRunVal; 
             batsmanRuns = 0;
             validBallCount = 0;
-            bowlerRunsConceded = 1 + runVal;
+            bowlerRunsConceded = 1 + effectiveRunVal;
         } else if (extraType === 'NO_BALL') {
             teamExtras = 1; 
-            batsmanRuns = runVal;
+            batsmanRuns = effectiveRunVal; // Runs off bat count to batsman
             validBallCount = 0;
-            bowlerRunsConceded = 1 + runVal;
+            bowlerRunsConceded = 1 + effectiveRunVal;
         } else if (extraType === 'LEG_BYE' || extraType === 'BYE') {
-            teamExtras = runVal;
+            teamExtras = effectiveRunVal;
             batsmanRuns = 0;
             validBallCount = 1;
             bowlerRunsConceded = 0; 
         } else {
+            // NORMAL DELIVERY (Bat runs)
             teamExtras = 0;
-            batsmanRuns = runVal;
+            batsmanRuns = effectiveRunVal;
             validBallCount = 1;
-            bowlerRunsConceded = runVal;
+            bowlerRunsConceded = effectiveRunVal;
         }
 
         // 2. UPDATE BATSMAN STATS (The Striker Always faces the ball unless it's a Wide)
@@ -268,8 +278,21 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         }
         
         striker.runs += batsmanRuns;
-        if (batsmanRuns === 4) striker.fours += 1;
-        if (batsmanRuns === 6) striker.sixes += 1;
+        
+        // Boundary Logic: If 4 or 6 was purely hit, record it.
+        // If Overthrow (+4) is used, we generally count the boundary if the shot itself reached, 
+        // but here it's an overthrow. Local apps usually just count runs.
+        // We will stick to basic: if total runs >= 4, increment boundary? 
+        // No, overthrow shouldn't count as a 'Four' statistic unless the ball hit the fence.
+        // For simplicity: We won't increment 4s/6s on overthrows unless explicitly 4/6 button was clicked.
+        if (!isOverthrow) {
+            if (batsmanRuns === 4) striker.fours += 1;
+            if (batsmanRuns === 6) striker.sixes += 1;
+        } else {
+            // If overthrow, usually counts as 4 if it hits boundary.
+            // Let's assume the +4 is the boundary part.
+             striker.fours += 1;
+        }
         
         // 3. HANDLE DISMISSAL
         if (isWicket) {
@@ -322,8 +345,8 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         let nextNonStriker = nonStrikerId;
         let nextBowler = bowlerId;
 
-        // Run rotation
-        if (runVal % 2 !== 0) {
+        // Run rotation (Total runs scored determine if they swapped ends)
+        if (effectiveRunVal % 2 !== 0) {
             const temp = nextStriker;
             nextStriker = nextNonStriker;
             nextNonStriker = temp;
@@ -392,11 +415,12 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             delete updatedMatch.winnerId;
         }
 
-        // Reset local states
+        // Reset local states immediately
         setExtraType('NONE');
-        setWicketType('NONE'); // Reset wicket
-        setWhoOut('STRIKER'); // Reset who out
-        setFielderId(''); // Reset fielder
+        setWicketType('NONE');
+        setWhoOut('STRIKER');
+        setFielderId('');
+        setIsOverthrow(false); // Reset overthrow state explicitly
         
         setStrikerId(nextStriker);
         setNonStrikerId(nextNonStriker);
@@ -580,21 +604,41 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                     </div>
                 </div>
 
-                {/* Extras & Wicket Selector */}
+                <div className="mb-2">
+                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-1 mb-3">Update Score:</h3>
+                </div>
+
+                {/* Extras & Wicket Selector Container */}
                 <div className="flex flex-col gap-4 mb-4">
+                     {/* Extras & Overthrow Mixed */}
                      <div className="flex flex-wrap justify-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <span className="text-xs font-bold text-slate-400 self-center uppercase mr-2">Extras:</span>
                         {['NONE', 'WIDE', 'NO_BALL', 'LEG_BYE', 'BYE'].map((type) => (
                             <button
                                 key={type}
-                                onClick={() => setExtraType(type as ExtraType)}
+                                onClick={() => {
+                                    setExtraType(type as ExtraType);
+                                    if (type !== 'NONE') setIsOverthrow(false); // Deactivate overthrow if extra selected
+                                }}
                                 className={`px-3 py-1 rounded text-xs font-bold transition-colors ${extraType === type ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border hover:bg-slate-100'}`}
                             >
-                                {type.replace('_', ' ')}
+                                {type === 'NONE' ? 'BATSMAN' : type.replace('_', ' ')}
                             </button>
                         ))}
+                        
+                        {/* Overthrow Button (Integrated) */}
+                        <button
+                            onClick={() => {
+                                const newState = !isOverthrow;
+                                setIsOverthrow(newState);
+                                if (newState) setExtraType('NONE'); // Deactivate extras if overthrow selected
+                            }}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${isOverthrow ? 'bg-purple-600 text-white' : 'bg-white text-slate-500 border hover:bg-slate-100'}`}
+                        >
+                            OVERTHROW (+4)
+                        </button>
                     </div>
 
+                    {/* Wicket */}
                     <div className={`flex flex-wrap justify-center gap-2 p-2 rounded-lg border transition-colors ${wicketType !== 'NONE' ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
                         <span className="text-xs font-bold text-red-400 self-center uppercase mr-2">Wicket:</span>
                          
@@ -688,6 +732,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                 </div>
 
                 <div className="text-center text-xs text-slate-400 mb-4 h-6">
+                    {isOverthrow && <span className="text-purple-600 font-bold mr-2">Overthrow Active: +4 Runs will be added!</span>}
                     {extraType === 'WIDE' && `Wide + Selected Runs (No Ball Count)`}
                     {extraType === 'NO_BALL' && `No Ball + Batsman Runs (No Ball Count)`}
                     {wicketType !== 'NONE' && (
