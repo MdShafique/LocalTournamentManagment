@@ -65,13 +65,6 @@ export const PublicView: React.FC = () => {
     matches.forEach(m => {
         if (!m.scorecard) return;
 
-        // Helper to format team name (e.g., first 2 words if very long, else full)
-        const formatTeamName = (tId: string) => {
-            const team = teams.find(t => t.id === tId);
-            if (!team) return 'Loading...';
-            return team.name;
-        };
-
         // Process Batting
         const processBatting = (scorecard: any[], teamId: string) => {
             scorecard.forEach(p => {
@@ -129,9 +122,7 @@ export const PublicView: React.FC = () => {
 
   return (
     <Layout title={tournament.name}>
-      <div className="mb-8 text-center sm:text-left">
-         <p className="text-slate-500 font-medium">{new Date(tournament.startDate).toLocaleDateString()} - {new Date(tournament.endDate).toLocaleDateString()}</p>
-      </div>
+      {/* Tournament info section removed for all devices for a cleaner look as requested. Title is in navbar. */}
 
       {liveMatches.length > 0 && (
           <div className="mb-8">
