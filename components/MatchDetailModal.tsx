@@ -8,17 +8,16 @@ interface Props {
   teamA: Team;
   teamB: Team;
   onClose: () => void;
+  onPlayerClick?: (playerId: string, teamId: string) => void;
 }
 
-export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose }) => {
+export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose, onPlayerClick }) => {
   const [timeLeft, setTimeLeft] = useState<string>('');
 
-  // Timer Logic
   useEffect(() => {
     if (match.status !== MatchStatus.SCHEDULED) return;
 
     const calculateTimeLeft = () => {
-      // Create date object from match date and time inputs
       const matchStart = new Date(`${match.date}T${match.time}`);
       const now = new Date();
       const difference = matchStart.getTime() - now.getTime();
@@ -29,27 +28,19 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
         const minutes = Math.floor((difference / 1000 / 60) % 60);
         const seconds = Math.floor((difference / 1000) % 60);
 
-        if (days > 0) {
-            return `${days}d ${hours}h ${minutes}m`;
-        }
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
         return `${hours}h ${minutes}m ${seconds}s`;
       } else {
         return "Starting Soon";
       }
     };
 
-    // Update immediately
     setTimeLeft(calculateTimeLeft());
-
-    // Update every second
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
     return () => clearInterval(timer);
   }, [match]);
 
-  const ScorecardTable = ({ battingTeam, bowlingTeam, scorecard, score, overs }: { battingTeam: Team, bowlingTeam: Team, scorecard?: TeamScorecard, score: any, overs: number }) => (
+  const ScorecardTable = ({ battingTeam, bowlingTeam, scorecard, score }: { battingTeam: Team, bowlingTeam: Team, scorecard?: TeamScorecard, score: any, overs: number }) => (
       <div className="mb-6">
           <div className="bg-slate-100 p-3 rounded-t-lg flex justify-between items-center border-b border-slate-200">
               <div className="flex items-center gap-3">
@@ -62,7 +53,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
           </div>
           <div className="bg-white border-x border-b border-slate-200 rounded-b-lg overflow-hidden text-sm">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px]"> {/* min-w forces scroll on mobile */}
+                <table className="w-full min-w-[500px]">
                     <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
                         <tr>
                             <th className="px-3 py-2 text-left w-2/5">Batter</th>
@@ -79,7 +70,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                             return (
                             <tr key={p.playerId} className={p.isOut ? 'text-slate-500' : 'text-slate-900 font-bold bg-emerald-50/30'}>
                                 <td className="px-3 py-2">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 cursor-pointer group" onClick={() => onPlayerClick?.(p.playerId, battingTeam.id)}>
                                         {player?.image ? (
                                             <img src={player.image} className="w-8 h-8 rounded-full object-cover border border-slate-100 shrink-0" alt="" />
                                         ) : (
@@ -88,7 +79,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                                             </div>
                                         )}
                                         <div className="flex flex-col min-w-0">
-                                            <span className="truncate max-w-[100px] sm:max-w-none">{p.playerName}</span>
+                                            <span className="truncate max-w-[100px] sm:max-w-none group-hover:text-emerald-600 transition-colors underline decoration-slate-200 underline-offset-2">{p.playerName}</span>
                                             {p.isOut ? (
                                                 <span className="text-red-500 text-[10px] sm:text-xs font-normal italic truncate max-w-[100px]">
                                                     {p.dismissal ? p.dismissal : 'out'}
@@ -108,9 +99,6 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                                 </td>
                             </tr>
                         )})}
-                        {(!scorecard?.batting || scorecard.batting.length === 0) && (
-                            <tr><td colSpan={6} className="text-center py-4 text-slate-400 italic">No batting data yet</td></tr>
-                        )}
                     </tbody>
                 </table>
               </div>
@@ -131,7 +119,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                         const bowler = bowlingTeam.players?.find(pl => pl.id === b.playerId);
                         return (
                         <div key={b.playerId} className="flex items-center px-3 py-2 text-xs sm:text-sm">
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer group" onClick={() => onPlayerClick?.(b.playerId, bowlingTeam.id)}>
                                 {bowler?.image ? (
                                     <img src={bowler.image} className="w-6 h-6 rounded-full object-cover border border-slate-100 shrink-0" alt="" />
                                 ) : (
@@ -139,7 +127,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                                         {b.playerName[0]}
                                     </div>
                                 )}
-                                <span className="font-medium truncate">{b.playerName}</span>
+                                <span className="font-medium truncate group-hover:text-blue-600 underline decoration-slate-200 underline-offset-2">{b.playerName}</span>
                             </div>
                             <span className="w-10 text-center">{b.overs}</span>
                             <span className="w-10 text-center text-slate-400">{b.maidens}</span>
@@ -159,7 +147,6 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-0 sm:p-4 backdrop-blur-sm">
       <div className="bg-white sm:rounded-xl shadow-2xl w-full h-full sm:h-[90vh] max-w-4xl flex flex-col animate-fade-in-up">
-        {/* Header */}
         <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 sm:rounded-t-xl shrink-0">
            <div>
                <h3 className="font-bold text-base sm:text-lg text-slate-800 flex flex-col sm:block">
@@ -174,9 +161,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition bg-white border border-slate-200 shadow-sm"><X size={20}/></button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-50/50">
-            {/* Result / Status Header */}
             <div className="text-center mb-6">
                  {match.status === MatchStatus.COMPLETED && match.winnerId ? (
                      <span className="inline-block px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm border border-emerald-200">

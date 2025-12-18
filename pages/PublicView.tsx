@@ -3,10 +3,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { getTeams, getTournament, subscribeToMatches } from '../services/storageService';
 import { calculateTable } from '../utils/statsHelper';
-import { Match, Team, Tournament, TableRow, MatchStatus } from '../types';
+import { Match, Team, Tournament, TableRow, MatchStatus, Player } from '../types';
 import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
+import { PlayerDetailModal } from '../components/PlayerDetailModal';
 import { Trophy, Activity, Calendar as CalIcon, BarChart3, Shield, Loader2, AlertCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
@@ -21,6 +22,7 @@ export const PublicView: React.FC = () => {
   const [error, setError] = useState('');
   
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [selectedPlayerInfo, setSelectedPlayerInfo] = useState<{player: Player, team: Team} | null>(null);
 
   useEffect(() => {
     const loadStaticData = async () => {
@@ -57,54 +59,65 @@ export const PublicView: React.FC = () => {
       return () => unsubscribe();
   }, [id, teams.length, selectedMatch?.id]); 
 
-  // Memoized stats calculation to ensure it updates when teams/matches arrive
+  // Memoized stats calculation for Top Scorers and Wicket Takers
   const topStats = useMemo(() => {
-    const battingStats: Record<string, {name: string, runs: number, team: string, image?: string}> = {};
-    const bowlingStats: Record<string, {name: string, wickets: number, team: string, image?: string}> = {};
+    const battingStats: Record<string, {playerId: string, name: string, runs: number, teamId: string, teamName: string, image?: string}> = {};
+    const bowlingStats: Record<string, {playerId: string, name: string, wickets: number, teamId: string, teamName: string, image?: string}> = {};
 
     matches.forEach(m => {
         if (!m.scorecard) return;
 
-        // Process Batting
-        const processBatting = (scorecard: any[], teamId: string) => {
-            scorecard.forEach(p => {
+        // Process Batting scorecard entries
+        const processBatting = (scorecardEntries: any[], teamId: string) => {
+            if (!scorecardEntries) return;
+            scorecardEntries.forEach(p => {
                 if(!battingStats[p.playerId]) {
                     const team = teams.find(t => t.id === teamId);
                     const player = team?.players?.find(pl => pl.id === p.playerId);
                     battingStats[p.playerId] = { 
+                        playerId: p.playerId,
                         name: p.playerName, 
                         runs: 0, 
-                        team: team?.name || 'Unknown', 
+                        teamId: teamId,
+                        teamName: team?.name || 'Unknown', 
                         image: player?.image 
                     };
                 }
-                battingStats[p.playerId].runs += p.runs;
+                battingStats[p.playerId].runs += (p.runs || 0);
             });
         };
 
-        // Process Bowling
-        const processBowling = (scorecard: any[], teamId: string) => {
-            scorecard.forEach(p => {
+        // Process Bowling scorecard entries
+        const processBowling = (scorecardEntries: any[], teamId: string) => {
+            if (!scorecardEntries) return;
+            scorecardEntries.forEach(p => {
                 if(!bowlingStats[p.playerId]) {
                     const team = teams.find(t => t.id === teamId);
                     const player = team?.players?.find(pl => pl.id === p.playerId);
                     bowlingStats[p.playerId] = { 
+                        playerId: p.playerId,
                         name: p.playerName, 
                         wickets: 0, 
-                        team: team?.name || 'Unknown', 
+                        teamId: teamId,
+                        teamName: team?.name || 'Unknown', 
                         image: player?.image 
                     };
                 }
-                bowlingStats[p.playerId].wickets += p.wickets;
+                bowlingStats[p.playerId].wickets += (p.wickets || 0);
             });
         };
 
-        processBatting(m.scorecard.A.batting, m.teamAId);
-        processBatting(m.scorecard.B.batting, m.teamBId);
+        // Innings A: Team A batting, Team B bowling
+        if (m.scorecard.A) {
+            processBatting(m.scorecard.A.batting, m.teamAId);
+            processBowling(m.scorecard.A.bowling, m.teamBId);
+        }
         
-        // Note: Team A is batting against Team B's bowling
-        processBowling(m.scorecard.A.bowling, m.teamBId); 
-        processBowling(m.scorecard.B.bowling, m.teamAId);
+        // Innings B: Team B batting, Team A bowling
+        if (m.scorecard.B) {
+            processBatting(m.scorecard.B.batting, m.teamBId);
+            processBowling(m.scorecard.B.bowling, m.teamAId);
+        }
     });
 
     return {
@@ -112,6 +125,28 @@ export const PublicView: React.FC = () => {
         topBowlers: Object.values(bowlingStats).sort((a,b) => b.wickets - a.wickets).slice(0, 10)
     };
   }, [matches, teams]);
+
+  // Robust player click handler with fallback search across all teams
+  const handlePlayerClick = (playerId: string, teamId: string) => {
+      let team = teams.find(t => t.id === teamId);
+      let player = team?.players?.find(p => p.id === playerId);
+
+      // Fallback: search all teams if player is not found in the expected team
+      if (!player) {
+          for (const t of teams) {
+              const p = t.players?.find(pl => pl.id === playerId);
+              if (p) {
+                  player = p;
+                  team = t;
+                  break;
+              }
+          }
+      }
+
+      if (player && team) {
+          setSelectedPlayerInfo({ player, team });
+      }
+  };
 
   if (error) return <Layout><div className="flex flex-col items-center justify-center pt-20"><AlertCircle size={48} className="text-red-400 mb-4"/><p>{error}</p></div></Layout>;
   if (loading || !tournament) return <Layout><div className="flex justify-center mt-20"><Loader2 className="animate-spin text-emerald-600" size={40}/></div></Layout>;
@@ -122,8 +157,6 @@ export const PublicView: React.FC = () => {
 
   return (
     <Layout title={tournament.name}>
-      {/* Tournament info section removed for all devices for a cleaner look as requested. Title is in navbar. */}
-
       {liveMatches.length > 0 && (
           <div className="mb-8">
               <h2 className="flex items-center gap-2 text-lg font-bold text-red-600 mb-4 animate-pulse"><Activity size={20} /> LIVE NOW</h2>
@@ -209,9 +242,9 @@ export const PublicView: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {team.players?.map(p => (
-                              <div key={p.id} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
+                              <div key={p.id} onClick={() => handlePlayerClick(p.id, team.id)} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors group">
                                   {p.image ? <img src={p.image} className="w-8 h-8 rounded-full object-cover border"/> : <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">{p.name[0]}</div>}
-                                  <div className="truncate"><p className="font-bold text-slate-700 truncate">{p.name}</p><p className="text-[10px] text-slate-400 uppercase font-semibold">{p.role}</p></div>
+                                  <div className="truncate"><p className="font-bold text-slate-700 group-hover:text-emerald-600 truncate">{p.name}</p><p className="text-[10px] text-slate-400 uppercase font-semibold">{p.role}</p></div>
                               </div>
                           ))}
                       </div>
@@ -222,12 +255,16 @@ export const PublicView: React.FC = () => {
 
       {activeTab === 'stats' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Top Batsmen */}
+              {/* Top Batsmen List */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="bg-orange-500 text-white px-6 py-4 flex items-center gap-2"><Trophy size={20}/><h3 className="font-bold uppercase tracking-wider">Top Scorers</h3></div>
                   <div className="divide-y divide-slate-100">
                       {topStats.topBatsmen.map((p, i) => (
-                          <div key={i} className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                          <div 
+                            key={p.playerId} 
+                            onClick={() => handlePlayerClick(p.playerId, p.teamId)} 
+                            className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 transition-colors cursor-pointer group"
+                          >
                               <div className="flex items-center gap-3 min-w-0">
                                   <span className="font-bold text-slate-300 w-5">#{i+1}</span>
                                   {p.image ? (
@@ -236,23 +273,27 @@ export const PublicView: React.FC = () => {
                                       <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 shrink-0 border border-slate-200">{p.name[0]}</div>
                                   )}
                                   <div className="truncate">
-                                      <p className="font-bold text-slate-800 truncate">{p.name}</p>
-                                      <p className="text-xs text-slate-500 font-semibold truncate bg-slate-100 inline-block px-1 rounded">{p.team}</p>
+                                      <p className="font-bold text-slate-800 group-hover:text-orange-600 truncate">{p.name}</p>
+                                      <p className="text-xs text-slate-500 font-semibold truncate bg-slate-100 inline-block px-1 rounded">{p.teamName}</p>
                                   </div>
                               </div>
                               <span className="font-mono font-bold text-emerald-600 text-xl pl-4">{p.runs}</span>
                           </div>
                       ))}
-                      {topStats.topBatsmen.length === 0 && <p className="p-10 text-center text-slate-400 italic">No batting stats available yet.</p>}
+                      {topStats.topBatsmen.length === 0 && <p className="p-8 text-center text-slate-400 italic">No batting data available.</p>}
                   </div>
               </div>
 
-              {/* Top Bowlers */}
+              {/* Top Bowlers List */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="bg-blue-600 text-white px-6 py-4 flex items-center gap-2"><Shield size={20}/><h3 className="font-bold uppercase tracking-wider">Top Wicket Takers</h3></div>
                   <div className="divide-y divide-slate-100">
                       {topStats.topBowlers.map((p, i) => (
-                          <div key={i} className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                          <div 
+                            key={p.playerId} 
+                            onClick={() => handlePlayerClick(p.playerId, p.teamId)} 
+                            className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 transition-colors cursor-pointer group"
+                          >
                               <div className="flex items-center gap-3 min-w-0">
                                   <span className="font-bold text-slate-300 w-5">#{i+1}</span>
                                   {p.image ? (
@@ -261,20 +302,29 @@ export const PublicView: React.FC = () => {
                                       <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 shrink-0 border border-slate-200">{p.name[0]}</div>
                                   )}
                                   <div className="truncate">
-                                      <p className="font-bold text-slate-800 truncate">{p.name}</p>
-                                      <p className="text-xs text-slate-500 font-semibold truncate bg-slate-100 inline-block px-1 rounded">{p.team}</p>
+                                      <p className="font-bold text-slate-800 group-hover:text-blue-600 truncate">{p.name}</p>
+                                      <p className="text-xs text-slate-500 font-semibold truncate bg-slate-100 inline-block px-1 rounded">{p.teamName}</p>
                                   </div>
                               </div>
                               <span className="font-mono font-bold text-blue-600 text-xl pl-4">{p.wickets}</span>
                           </div>
                       ))}
-                      {topStats.topBowlers.length === 0 && <p className="p-10 text-center text-slate-400 italic">No bowling stats available yet.</p>}
+                      {topStats.topBowlers.length === 0 && <p className="p-8 text-center text-slate-400 italic">No bowling data available.</p>}
                   </div>
               </div>
           </div>
       )}
 
-      {selectedMatch && <MatchDetailModal match={selectedMatch} teamA={teams.find(t => t.id === selectedMatch.teamAId)!} teamB={teams.find(t => t.id === selectedMatch.teamBId)!} onClose={() => setSelectedMatch(null)} />}
+      {selectedMatch && <MatchDetailModal match={selectedMatch} teamA={teams.find(t => t.id === selectedMatch.teamAId)!} teamB={teams.find(t => t.id === selectedMatch.teamBId)!} onPlayerClick={handlePlayerClick} onClose={() => setSelectedMatch(null)} />}
+      
+      {selectedPlayerInfo && (
+        <PlayerDetailModal 
+            player={selectedPlayerInfo.player} 
+            team={selectedPlayerInfo.team} 
+            matches={matches} 
+            onClose={() => setSelectedPlayerInfo(null)} 
+        />
+      )}
     </Layout>
   );
 };
