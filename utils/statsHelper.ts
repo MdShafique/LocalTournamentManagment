@@ -1,5 +1,4 @@
-
-import { Match, Team, TableRow, MatchStatus, Player } from '../types';
+import { Match, Team, TableRow, MatchStatus } from '../types';
 import { ballsFromOvers } from '../services/storageService';
 
 export const calculateTable = (teams: Team[], matches: Match[]): TableRow[] => {
@@ -19,6 +18,7 @@ export const calculateTable = (teams: Team[], matches: Match[]): TableRow[] => {
     };
   });
 
+  // Temporary storage for NRR calc
   const nrrStats: Record<string, { runsScored: number, ballsFaced: number, runsConceded: number, ballsBowled: number }> = {};
   teams.forEach(t => {
       nrrStats[t.id] = { runsScored: 0, ballsFaced: 0, runsConceded: 0, ballsBowled: 0 };
@@ -31,6 +31,7 @@ export const calculateTable = (teams: Team[], matches: Match[]): TableRow[] => {
       stats[m.teamAId].played++;
       stats[m.teamBId].played++;
 
+      // Points
       if (m.winnerId === m.teamAId) {
         stats[m.teamAId].won++;
         stats[m.teamAId].points += 2;
@@ -46,11 +47,17 @@ export const calculateTable = (teams: Team[], matches: Match[]): TableRow[] => {
         stats[m.teamBId].points += 1;
       }
 
+      // NRR Data Accumulation
+      // Note: In real ICC rules, if a team is all out, balls faced is treated as full quota of overs.
+      // For simplicity here, we use actual balls unless all out logic is added strictly.
+      
+      // Team A stats
       nrrStats[m.teamAId].runsScored += m.scoreA.runs;
       nrrStats[m.teamAId].ballsFaced += (m.scoreA.wickets === 10 ? m.totalOvers * 6 : ballsFromOvers(m.scoreA.overs));
       nrrStats[m.teamAId].runsConceded += m.scoreB.runs;
       nrrStats[m.teamAId].ballsBowled += (m.scoreB.wickets === 10 ? m.totalOvers * 6 : ballsFromOvers(m.scoreB.overs));
 
+      // Team B stats
       nrrStats[m.teamBId].runsScored += m.scoreB.runs;
       nrrStats[m.teamBId].ballsFaced += (m.scoreB.wickets === 10 ? m.totalOvers * 6 : ballsFromOvers(m.scoreB.overs));
       nrrStats[m.teamBId].runsConceded += m.scoreA.runs;
@@ -58,6 +65,7 @@ export const calculateTable = (teams: Team[], matches: Match[]): TableRow[] => {
     }
   });
 
+  // Calculate Final NRR
   Object.keys(stats).forEach(tid => {
       const d = nrrStats[tid];
       if (d.ballsFaced > 0 && d.ballsBowled > 0) {
@@ -71,68 +79,4 @@ export const calculateTable = (teams: Team[], matches: Match[]): TableRow[] => {
     if (b.points !== a.points) return b.points - a.points;
     return b.nrr - a.nrr;
   });
-};
-
-export interface PlayerAggregateStats {
-    inningsBat: number;
-    runs: number;
-    balls: number;
-    dismissals: number;
-    highest: number;
-    strikeRate: number;
-    average: number;
-    inningsBowl: number;
-    wickets: number;
-    runsConceded: number;
-    ballsBowled: number;
-    economy: number;
-}
-
-export const calculatePlayerAggregateStats = (playerId: string, matches: Match[]): PlayerAggregateStats => {
-    let runs = 0, balls = 0, dismissals = 0, highest = 0, inningsBat = 0;
-    let wickets = 0, runsConceded = 0, ballsBowled = 0, inningsBowl = 0;
-
-    matches.forEach(m => {
-        if (!m.scorecard) return;
-        
-        // Batting lookup
-        const batA = m.scorecard.A.batting.find(p => p.playerId === playerId);
-        const batB = m.scorecard.B.batting.find(p => p.playerId === playerId);
-        const bat = batA || batB;
-
-        if (bat) {
-            inningsBat++;
-            runs += bat.runs;
-            balls += bat.balls;
-            if (bat.isOut) dismissals++;
-            if (bat.runs > highest) highest = bat.runs;
-        }
-
-        // Bowling lookup
-        const bowlA = m.scorecard.A.bowling.find(p => p.playerId === playerId);
-        const bowlB = m.scorecard.B.bowling.find(p => p.playerId === playerId);
-        const bowl = bowlA || bowlB;
-
-        if (bowl) {
-            inningsBowl++;
-            wickets += bowl.wickets;
-            runsConceded += bowl.runsConceded;
-            ballsBowled += bowl.ballsBowled;
-        }
-    });
-
-    return {
-        inningsBat,
-        runs,
-        balls,
-        dismissals,
-        highest,
-        strikeRate: balls > 0 ? (runs / balls) * 100 : 0,
-        average: dismissals > 0 ? runs / dismissals : (inningsBat > 0 ? runs : 0),
-        inningsBowl,
-        wickets,
-        runsConceded,
-        ballsBowled,
-        economy: ballsBowled > 0 ? (runsConceded / ballsBowled) * 6 : 0
-    };
 };
