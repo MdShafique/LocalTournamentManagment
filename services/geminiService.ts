@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Match, Team } from '../types';
 
@@ -9,24 +10,25 @@ export const generateAICommentary = async (match: Match, teamA: Team, teamB: Tea
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Construct a context string
+    // Construct a context string using full names for better clarity
     const matchState = `
       Match: ${teamA.name} vs ${teamB.name}
       Status: ${match.status}
-      ${teamA.shortName} Score: ${match.scoreA.runs}/${match.scoreA.wickets} (${match.scoreA.overs} overs)
-      ${teamB.shortName} Score: ${match.scoreB.runs}/${match.scoreB.wickets} (${match.scoreB.overs} overs)
+      ${teamA.name} Score: ${match.scoreA.runs}/${match.scoreA.wickets} (${match.scoreA.overs} overs)
+      ${teamB.name} Score: ${match.scoreB.runs}/${match.scoreB.wickets} (${match.scoreB.overs} overs)
       Target (if 2nd innings): ${match.scoreB.balls > 0 ? `Chasing ${match.scoreA.runs + 1}` : '1st Innings'}
     `;
 
     const prompt = `
-      Act as an exciting cricket commentator. 
+      Act as an exciting cricket commentator like Harsha Bhogle or Ravi Shastri. 
       Generate a short, punchy 2-sentence summary of the current match situation for the live ticker.
       Focus on the tension, run rate, or wickets.
+      Use full team names: ${teamA.name} and ${teamB.name}.
       Match Data: ${matchState}
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
