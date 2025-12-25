@@ -6,13 +6,15 @@ export enum MatchStatus {
   ABANDONED = 'ABANDONED'
 }
 
+export type StageType = 'group' | 'knockout';
+
 export interface Player {
   id: string;
   name: string;
   role: 'Batsman' | 'Bowler' | 'All-Rounder' | 'WicketKeeper';
   totalRuns: number;
   totalWickets: number;
-  image?: string; // New: Player Image URL
+  image?: string;
 }
 
 export interface Team {
@@ -57,6 +59,12 @@ export interface BowlingStats {
 export interface TeamScorecard {
     batting: BattingStats[];
     bowling: BowlingStats[];
+    extras?: {
+      wide: number;
+      noBall: number;
+      bye: number;
+      legBye: number;
+    };
 }
 
 export interface LiveDetails {
@@ -78,6 +86,7 @@ export interface Match {
   venue: string;
   type: string; 
   groupStage: string; 
+  stageType?: StageType; 
   status: MatchStatus;
   totalOvers: number;
   
@@ -91,9 +100,13 @@ export interface Match {
 
   liveDetails?: LiveDetails; 
   winnerId?: string;
-  manOfTheMatch?: string;
+  manOfTheMatch?: string; 
   commentary?: string[];
-  history?: string[]; // New: Stores JSON stringified snapshots of previous states
+  history?: string[];
+  
+  // Tracking for maiden overs calculation
+  currentOverRuns?: number;
+  currentOverBalls?: number;
 }
 
 export interface Tournament {
@@ -103,6 +116,14 @@ export interface Tournament {
   endDate: string;
   adminId: string;
   logo?: string;
+  seriesAwards?: {
+      playerOfSeries?: string;
+      bestBatsman?: string;
+      bestBowler?: string;
+      championTeamId?: string;
+      runnersUpTeamId?: string;
+      emergencyNotes?: string;
+  };
 }
 
 export interface TableRow {

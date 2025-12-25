@@ -1,6 +1,13 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup as firebaseSignIn, signOut as firebaseSignOut, onAuthStateChanged as firebaseOnAuth } from "firebase/auth";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup as firebaseSignIn, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged as firebaseOnAuth,
+  User 
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
@@ -15,18 +22,16 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
+// Fix: Use a safer initialization pattern for Firebase modular SDK ensuring app instance is singleton
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
+// Fix: Exporting modular instances with correct initialization
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // Wrappers
+// Fix: Providing functional wrappers that call standard Firebase methods
 export const signInWithPopup = async (authInstance: any, provider: any) => {
   return firebaseSignIn(authInstance, provider);
 };
@@ -39,4 +44,5 @@ export const onAuthStateChanged = (authInstance: any, callback: any) => {
   return firebaseOnAuth(authInstance, callback);
 };
 
-export type User = import("firebase/auth").User;
+// Fix: Correctly exporting the User type from firebase/auth to avoid namespace resolution errors
+export type { User };
