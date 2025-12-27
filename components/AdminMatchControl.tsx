@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player, TeamScorecard } from '../types';
 import { calculateOvers } from '../services/storageService';
 import { generateAICommentary } from '../services/geminiService';
-import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle, RotateCcw, PlusCircle, Award, Star } from 'lucide-react';
+import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle, RotateCcw, PlusCircle, Award, Star, RefreshCw, PlayCircle } from 'lucide-react';
 
 interface Props {
   match: Match;
@@ -126,6 +126,16 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       } finally {
           setIsUpdating(false);
       }
+  };
+
+  const handleStartMatch = async () => {
+      setIsUpdating(true);
+      try {
+        const updated = JSON.parse(JSON.stringify(match)) as Match;
+        updated.status = MatchStatus.LIVE;
+        await onUpdate(updated);
+      } catch (e) { console.error(e); } 
+      finally { setIsUpdating(false); }
   };
 
   const handleManualEndInnings = async () => {
@@ -416,6 +426,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       finally { setIsUpdating(false); }
   };
 
+  const isMatchStarting = match.status === MatchStatus.SCHEDULED;
   const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared);
   const allPlayers = [...(teamA.players || []), ...(teamB.players || [])];
 
@@ -438,9 +449,14 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                  {activeInnings === 'A' ? teamA.name : teamB.name} Batting
                  {activeInnings === 'B' && <span className="text-xs bg-slate-100 px-2 py-1 rounded border">Target: {target}</span>}
              </h2>
-             <p className="text-slate-500 text-xs mt-1">{match.status}</p>
+             <p className="text-slate-500 text-xs mt-1 uppercase tracking-widest font-black">{match.status}</p>
          </div>
          <div className="flex gap-2">
+            {(isMatchStarting || match.scoreA.balls === 0) && match.status !== MatchStatus.COMPLETED && (
+                <button onClick={handleSwapBattingFirst} disabled={isUpdating} className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded flex items-center gap-2 text-sm font-bold border border-emerald-200" title="Switch Batting Team">
+                    <ArrowRightLeft size={18} /> <span className="hidden sm:inline">Switch Batting</span>
+                </button>
+            )}
             {match.history && match.history.length > 0 && (
                 <button onClick={handleUndo} disabled={isUpdating} className="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded flex items-center gap-2 text-sm font-bold border border-slate-200">
                     <RotateCcw size={18} /> <span className="hidden sm:inline">Undo</span>
@@ -457,12 +473,35 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
          </div>
       </div>
 
-      {match.status === MatchStatus.COMPLETED ? (
+      {isMatchStarting ? (
+          <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-8 text-center mb-8 animate-fade-in-down">
+              <div className="flex justify-center mb-4"><Trophy className="text-emerald-600" size={48}/></div>
+              <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tight">Match Setup & Toss</h3>
+              <p className="text-slate-500 mb-6 text-sm">Select which team bats first based on the toss result.</p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <div className="flex-1 bg-white p-4 rounded-xl border-2 border-emerald-100 shadow-sm w-full">
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Batting First</p>
+                      <p className="text-lg font-bold text-slate-800">{teamA.name}</p>
+                  </div>
+                  <button onClick={handleSwapBattingFirst} className="p-4 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-transform active:scale-90 shadow-lg">
+                      <RefreshCw size={24}/>
+                  </button>
+                  <div className="flex-1 bg-white p-4 rounded-xl border-2 border-slate-100 shadow-sm w-full">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bowling First</p>
+                      <p className="text-lg font-bold text-slate-800">{teamB.name}</p>
+                  </div>
+              </div>
+
+              <button onClick={handleStartMatch} className="mt-8 bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2 mx-auto hover:bg-emerald-700 shadow-xl shadow-emerald-100">
+                  <PlayCircle size={24}/> Start Live Scoring
+              </button>
+          </div>
+      ) : match.status === MatchStatus.COMPLETED ? (
            <div className="text-center py-8">
                <h3 className="text-2xl font-bold text-slate-800 mb-2">Match Completed</h3>
                <p className="text-emerald-600 font-bold text-lg mb-4">Winner: {match.winnerId === teamA.id ? teamA.name : (match.winnerId === teamB.id ? teamB.name : "Match Tied")}</p>
                
-               {/* New MOM Selection */}
                <div className="max-w-xs mx-auto mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Man of the Match</label>
                    <select 
