@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTournamentsByAdmin, saveTournament } from '../services/storageService';
+import { getTournamentsByAdmin, saveTournament, deleteTournament } from '../services/storageService';
 import { auth, googleProvider, signInWithPopup, onAuthStateChanged, User, signOut } from '../services/firebase';
 import { Tournament } from '../types';
 import { Layout } from '../components/Layout';
-import { Plus, ChevronRight, LogOut, Loader2, User as UserIcon, AlertTriangle, Settings } from 'lucide-react';
+import { Plus, ChevronRight, LogOut, Loader2, User as UserIcon, AlertTriangle, Settings, Trash2, MapPin } from 'lucide-react';
 
 export const AdminHome: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -13,6 +12,7 @@ export const AdminHome: React.FC = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [newTourneyName, setNewTourneyName] = useState('');
+  const [newTourneyVenue, setNewTourneyVenue] = useState('');
   
   // Auth Error State
   const [authError, setAuthError] = useState<{message: string, type?: string} | null>(null);
@@ -80,6 +80,7 @@ export const AdminHome: React.FC = () => {
       const newT: Tournament = {
           id: Date.now().toString(),
           name: newTourneyName,
+          venue: newTourneyVenue,
           startDate: new Date().toISOString(),
           endDate: new Date().toISOString(),
           adminId: user.uid
@@ -88,6 +89,19 @@ export const AdminHome: React.FC = () => {
       await loadTournaments(user.uid);
       setShowCreate(false);
       setNewTourneyName('');
+      setNewTourneyVenue('');
+      setIsLoading(false);
+  };
+
+  const handleDeleteTournament = async (tid: string) => {
+      setIsLoading(true);
+      try {
+          await deleteTournament(tid);
+          if (user) await loadTournaments(user.uid);
+      } catch (error) {
+          console.error("Error deleting tournament:", error);
+          alert("Failed to delete tournament.");
+      }
       setIsLoading(false);
   };
 
@@ -101,7 +115,7 @@ export const AdminHome: React.FC = () => {
           <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
               <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
                   <div className="text-center mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">BKPL Cricket Tournament</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">CricManage Pro</h1>
                     <p className="text-slate-500">Admin Portal Access</p>
                   </div>
                   
@@ -184,17 +198,32 @@ export const AdminHome: React.FC = () => {
         {showCreate && (
             <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 mb-8 animate-fade-in-down">
                 <h3 className="font-bold mb-4">Create New Tournament</h3>
-                <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-4">
-                    <input 
-                        type="text" 
-                        required
-                        value={newTourneyName}
-                        onChange={(e) => setNewTourneyName(e.target.value)}
-                        placeholder="Tournament Name (e.g. Summer Cup 2024)"
-                        className="flex-1 border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                    <button type="submit" disabled={isLoading} className="bg-slate-900 text-white px-6 py-2 rounded-lg hover:bg-slate-800 disabled:opacity-50">
-                        {isLoading ? 'Creating...' : 'Create'}
+                <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block ml-1">Name</label>
+                            <input 
+                                type="text" 
+                                required
+                                value={newTourneyName}
+                                onChange={(e) => setNewTourneyName(e.target.value)}
+                                placeholder="Tournament Name (e.g. Summer Cup 2024)"
+                                className="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block ml-1">Default Venue</label>
+                            <input 
+                                type="text" 
+                                value={newTourneyVenue}
+                                onChange={(e) => setNewTourneyVenue(e.target.value)}
+                                placeholder="e.g. Dhaka National Stadium"
+                                className="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                    <button type="submit" disabled={isLoading} className="bg-slate-900 text-white px-6 py-3 rounded-lg hover:bg-slate-800 disabled:opacity-50 font-bold">
+                        {isLoading ? 'Creating...' : 'Create Tournament'}
                     </button>
                 </form>
             </div>
@@ -215,12 +244,27 @@ export const AdminHome: React.FC = () => {
                         </div>
 
                         <div className="flex justify-between items-start mb-4 relative z-10">
-                            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shadow-inner">
-                                <span className="font-bold text-xl uppercase">{t.name[0]}</span>
+                            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shadow-inner overflow-hidden">
+                                {t.logo ? <img src={t.logo} className="w-full h-full object-cover" alt="logo"/> : <span className="font-bold text-xl uppercase">{t.name[0]}</span>}
                             </div>
-                            <ChevronRight className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if(window.confirm(`Are you sure you want to delete "${t.name}"? This action cannot be undone.`)) {
+                                            handleDeleteTournament(t.id);
+                                        }
+                                    }}
+                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Delete Tournament"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                                <ChevronRight className="text-slate-300 group-hover:text-emerald-500 transition-colors self-center" />
+                            </div>
                         </div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-1 relative z-10">{t.name}</h3>
+                        <h3 className="text-lg font-bold text-slate-900 mb-1 relative z-10 truncate pr-8">{t.name}</h3>
+                        {t.venue && <p className="text-xs text-slate-400 mb-2 flex items-center gap-1"><MapPin size={10}/> {t.venue}</p>}
                         <p className="text-sm text-slate-500 relative z-10">Started: {new Date(t.startDate).toLocaleDateString()}</p>
                     </div>
                 ))}

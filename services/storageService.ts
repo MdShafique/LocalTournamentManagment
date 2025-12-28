@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   doc, 
@@ -8,7 +7,8 @@ import {
   deleteDoc, 
   query, 
   where, 
-  onSnapshot 
+  onSnapshot,
+  QuerySnapshot 
 } from "firebase/firestore";
 import { db } from './firebase';
 import { Tournament, Team, Match, MatchStatus, Player, StageType } from '../types';
@@ -95,6 +95,10 @@ export const saveTournament = async (tournament: Tournament) => {
     await setDoc(doc(db, TOURNAMENTS_COL, tournament.id), cleanForFirestore(tournament));
 };
 
+export const deleteTournament = async (id: string) => {
+    await deleteDoc(doc(db, TOURNAMENTS_COL, id));
+};
+
 // --- TEAM METHODS ---
 
 // Fix: Standard Firestore modular retrieval for teams by tournament
@@ -166,11 +170,14 @@ export const getMatches = async (tournamentId: string): Promise<Match[]> => {
     return snapshot.docs.map(d => repairMatchData(d.data() as Match));
 };
 
+// Fix: Explicitly type the snapshot as QuerySnapshot to resolve the 'docs' property error in the callback
 export const subscribeToMatches = (tournamentId: string, callback: (matches: Match[]) => void) => {
     const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const matches = snapshot.docs.map(d => repairMatchData(d.data() as Match));
+        // Casting snapshot to QuerySnapshot ensures access to the 'docs' property when using onSnapshot with a Query
+        const querySnapshot = snapshot as QuerySnapshot;
+        const matches = querySnapshot.docs.map(d => repairMatchData(d.data() as Match));
         callback(matches);
     }, (error) => {
         console.error("Error subscribing to matches:", error);
@@ -196,7 +203,8 @@ export const initializeMatch = (
   type: string, 
   totalOvers: number,
   group: string,
-  stageType: StageType = 'group'
+  stageType: StageType = 'group',
+  venue: string = 'Main Ground'
 ): Match => ({
   id: Date.now().toString(),
   tournamentId: tId,
@@ -204,7 +212,7 @@ export const initializeMatch = (
   teamBId: teamB,
   date,
   time,
-  venue: 'Main Ground',
+  venue,
   type,
   groupStage: group,
   stageType,

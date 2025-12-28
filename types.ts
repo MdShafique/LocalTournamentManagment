@@ -116,12 +116,12 @@ export interface Tournament {
   endDate: string;
   adminId: string;
   logo?: string;
+  venue?: string;
   seriesAwards?: {
       playerOfSeries?: string;
       bestBatsman?: string;
       bestBowler?: string;
       championTeamId?: string;
-      runnersUpTeamId?: string;
       emergencyNotes?: string;
   };
 }
