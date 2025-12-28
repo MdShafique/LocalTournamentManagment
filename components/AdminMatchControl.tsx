@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player, TeamScorecard } from '../types';
+import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player, TeamScorecard, LiveDetails } from '../types';
 import { calculateOvers } from '../services/storageService';
 import { generateAICommentary } from '../services/geminiService';
 import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle, RotateCcw, PlusCircle, Award, Star, RefreshCw, PlayCircle } from 'lucide-react';
@@ -90,6 +90,39 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
           stats.maidens = 0;
       }
       return stats;
+  };
+
+  const handleLiveDetailChange = async (field: keyof LiveDetails, value: string) => {
+    setIsUpdating(true);
+    try {
+        const updatedMatch = JSON.parse(JSON.stringify(match)) as Match;
+        if (!updatedMatch.liveDetails) {
+            updatedMatch.liveDetails = { strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '', bowlerId: '', bowlerName: '' };
+        }
+
+        if (field === 'strikerId') {
+            updatedMatch.liveDetails.strikerId = value;
+            const p = battingTeam.players?.find(pl => pl.id === value);
+            updatedMatch.liveDetails.strikerName = p?.name || '';
+            setStrikerId(value);
+        } else if (field === 'nonStrikerId') {
+            updatedMatch.liveDetails.nonStrikerId = value;
+            const p = battingTeam.players?.find(pl => pl.id === value);
+            updatedMatch.liveDetails.nonStrikerName = p?.name || '';
+            setNonStrikerId(value);
+        } else if (field === 'bowlerId') {
+            updatedMatch.liveDetails.bowlerId = value;
+            const p = bowlingTeam.players?.find(pl => pl.id === value);
+            updatedMatch.liveDetails.bowlerName = p?.name || '';
+            setBowlerId(value);
+        }
+
+        await onUpdate(updatedMatch);
+    } catch (e) {
+        console.error("Live detail update failed", e);
+    } finally {
+        setIsUpdating(false);
+    }
   };
 
   const handleMOMSelect = async (pid: string) => {
@@ -281,6 +314,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
              striker.fours += 1;
         }
         
+        // --- 1. HANDLE WICKET FIRST (FIX FOR 6TH BALL) ---
         if (isWicket) {
             const dismissedPlayerId = (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') ? nonStrikerId : strikerId;
             const dismissedPlayerStats = getBattingStats(dismissedPlayerId, targetBattingList, battingTeam);
@@ -319,8 +353,6 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             if (updatedMatch.currentOverRuns === 0) {
                 bowler.maidens = (bowler.maidens || 0) + 1;
             }
-            updatedMatch.currentOverRuns = 0;
-            updatedMatch.currentOverBalls = 0;
         }
 
         targetScore.runs += batsmanRuns + teamExtras;
@@ -328,10 +360,18 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         targetScore.balls += validBallCount;
         targetScore.overs = calculateOvers(targetScore.balls);
 
+        // --- 2. CALCULATE NEXT STRIKER & OVER ROTATION ---
         let nextStriker = strikerId;
         let nextNonStriker = nonStrikerId;
         let nextBowler = bowlerId;
 
+        // Clear player ID if they got out
+        if (isWicket) {
+            if (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') nextNonStriker = ''; 
+            else nextStriker = '';
+        }
+
+        // Swap for runs
         if (effectiveRunVal % 2 !== 0) {
             const temp = nextStriker;
             nextStriker = nextNonStriker;
@@ -340,15 +380,13 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
         const isOverUp = targetScore.balls > 0 && targetScore.balls % 6 === 0 && validBallCount === 1;
         if (isOverUp) {
+            // End of over strike rotation
             const temp = nextStriker;
             nextStriker = nextNonStriker;
             nextNonStriker = temp;
             nextBowler = ''; 
-        }
-
-        if (isWicket) {
-            if (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') nextNonStriker = ''; 
-            else nextStriker = '';
+            updatedMatch.currentOverRuns = 0;
+            updatedMatch.currentOverBalls = 0;
         }
 
         let autoWinnerId: string | undefined = undefined;
@@ -524,7 +562,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-emerald-700 mb-1">On Strike</label>
-                        <select className={`w-full border rounded px-2 py-2 text-sm ${!strikerId ? 'border-red-400' : ''}`} value={strikerId} onChange={(e) => setStrikerId(e.target.value)}>
+                        <select className={`w-full border rounded px-2 py-2 text-sm ${!strikerId ? 'border-red-400' : ''}`} value={strikerId} onChange={(e) => handleLiveDetailChange('strikerId', e.target.value)}>
                             <option value="">Select Striker...</option>
                             {strikerId && <option value={strikerId}>{battingTeam.players?.find(p=>p.id===strikerId)?.name}</option>}
                             {getAvailableBatsmen().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -532,7 +570,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Non-Striker</label>
-                        <select className={`w-full border rounded px-2 py-2 text-sm ${!nonStrikerId ? 'border-red-400' : ''}`} value={nonStrikerId} onChange={(e) => setNonStrikerId(e.target.value)}>
+                        <select className={`w-full border rounded px-2 py-2 text-sm ${!nonStrikerId ? 'border-red-400' : ''}`} value={nonStrikerId} onChange={(e) => handleLiveDetailChange('nonStrikerId', e.target.value)}>
                             <option value="">Select Non-Striker...</option>
                             {nonStrikerId && <option value={nonStrikerId}>{battingTeam.players?.find(p=>p.id===nonStrikerId)?.name}</option>}
                             {getAvailableBatsmen().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -540,7 +578,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-blue-700 mb-1">Bowler</label>
-                        <select className={`w-full border rounded px-2 py-2 text-sm ${!bowlerId ? 'border-red-500' : ''}`} value={bowlerId} onChange={(e) => setBowlerId(e.target.value)}>
+                        <select className={`w-full border rounded px-2 py-2 text-sm ${!bowlerId ? 'border-red-500' : ''}`} value={bowlerId} onChange={(e) => handleLiveDetailChange('bowlerId', e.target.value)}>
                             <option value="">Select Bowler...</option>
                             {bowlingTeam.players?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>

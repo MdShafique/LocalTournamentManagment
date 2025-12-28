@@ -6,7 +6,7 @@ import { Layout } from '../components/Layout';
 import { AdminMatchControl } from '../components/AdminMatchControl';
 import { MatchCard } from '../components/MatchCard';
 import { auth, onAuthStateChanged } from '../services/firebase'; 
-import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock, Edit2, Check, UserPlus, Save, Layers, Clock, Medal, Trophy } from 'lucide-react';
+import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock, Edit2, Check, UserPlus, Save, Layers, Clock } from 'lucide-react';
 
 export const TournamentAdmin: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +15,7 @@ export const TournamentAdmin: React.FC = () => {
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [view, setView] = useState<'overview' | 'teams' | 'matches' | 'awards'>('overview');
+  const [view, setView] = useState<'overview' | 'teams' | 'matches'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [permissionDenied, setPermissionDenied] = useState(false);
   
@@ -34,6 +34,7 @@ export const TournamentAdmin: React.FC = () => {
 
   const [showScheduler, setShowScheduler] = useState(false);
   const [schedData, setSchedData] = useState({
+      id: '', // Added to track if we are editing
       teamA: '', teamB: '',
       date: new Date().toISOString().split('T')[0],
       time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage',
@@ -64,6 +65,8 @@ export const TournamentAdmin: React.FC = () => {
         setTournament(t);
         setTeams(tm);
         setMatches(m);
+        
+        // Update selected team if in squad view
         setSelectedTeamForSquad(prev => prev ? tm.find(team => team.id === prev.id) || null : null);
     } catch (err) {
         console.error("Refresh Error:", err);
@@ -84,19 +87,6 @@ export const TournamentAdmin: React.FC = () => {
     return () => unsubscribe();
   }, [refreshData]);
 
-  // Enhanced allPlayers to include team names for identification
-  const allPlayers = useMemo(() => {
-    const list: (Player & { teamName: string })[] = [];
-    teams.forEach(t => {
-      if (t.players) {
-        t.players.forEach(p => {
-          list.push({ ...p, teamName: t.name });
-        });
-      }
-    });
-    return list.sort((a,b) => a.name.localeCompare(b.name));
-  }, [teams]);
-
   const groupedTeams = useMemo(() => {
     const groups: Record<string, Team[]> = {};
     teams.forEach(t => {
@@ -107,6 +97,9 @@ export const TournamentAdmin: React.FC = () => {
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [teams]);
 
+  /**
+   * Prioritize matches: Live -> Scheduled (Soonest first) -> Completed (Recent first)
+   */
   const sortedMatches = useMemo(() => {
       const live = matches.filter(m => m.status === MatchStatus.LIVE);
       const scheduled = matches.filter(m => m.status === MatchStatus.SCHEDULED).sort((a, b) => {
@@ -117,7 +110,6 @@ export const TournamentAdmin: React.FC = () => {
       const results = matches.filter(m => m.status === MatchStatus.COMPLETED || m.status === MatchStatus.ABANDONED).sort((a, b) => {
           const dtA = new Date(`${a.date} ${a.time}`).getTime();
           const dtB = new Date(`${b.date} ${b.time}`).getTime();
-          // Fix: Proper sorting for results (date descending)
           return dtB - dtA;
       });
       return [...live, ...scheduled, ...results];
@@ -128,14 +120,6 @@ export const TournamentAdmin: React.FC = () => {
       if (!tournament) return;
       await saveTournament(tournament);
       setIsEditingTournament(false);
-  };
-
-  const handleSaveAwards = async () => {
-    if (!tournament) return;
-    setIsLoading(true);
-    await saveTournament(tournament);
-    setIsLoading(false);
-    alert("Awards saved successfully!");
   };
 
   const handleAddTeam = async () => {
@@ -188,20 +172,49 @@ export const TournamentAdmin: React.FC = () => {
   const handleCreateMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || schedData.teamA === schedData.teamB) return;
-    const m = initializeMatch(
-      id, 
-      schedData.teamA, 
-      schedData.teamB, 
-      schedData.date, 
-      schedData.time, 
-      schedData.type, 
-      schedData.overs, 
-      schedData.groupStage,
-      schedData.stageType
-    );
-    await saveMatch(m);
+
+    if (schedData.id) {
+        // EDIT MODE: Update existing match to avoid duplication
+        const matchToUpdate = matches.find(m => m.id === schedData.id);
+        if (matchToUpdate) {
+            const updated = {
+                ...matchToUpdate,
+                teamAId: schedData.teamA,
+                teamBId: schedData.teamB,
+                date: schedData.date,
+                time: schedData.time,
+                totalOvers: schedData.overs,
+                type: schedData.type,
+                groupStage: schedData.groupStage,
+                stageType: schedData.stageType
+            };
+            await saveMatch(updated);
+        }
+    } else {
+        // CREATE MODE: Generate a new match
+        const m = initializeMatch(
+          id, 
+          schedData.teamA, 
+          schedData.teamB, 
+          schedData.date, 
+          schedData.time, 
+          schedData.type, 
+          schedData.overs, 
+          schedData.groupStage,
+          schedData.stageType
+        );
+        await saveMatch(m);
+    }
+
     await refreshData();
     setShowScheduler(false);
+    // Reset schedData to defaults
+    setSchedData({
+        id: '', teamA: '', teamB: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage',
+        stageType: 'group'
+    });
     setView('matches');
   };
 
@@ -257,7 +270,7 @@ export const TournamentAdmin: React.FC = () => {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-slate-200">
-          {['overview', 'teams', 'matches', 'awards'].map(tab => (
+          {['overview', 'teams', 'matches'].map(tab => (
               <button key={tab} onClick={() => { setView(tab as any); setActiveMatch(null); setSelectedTeamForSquad(null); }} className={`px-4 py-2 rounded-lg font-medium capitalize ${view === tab && !activeMatch && !selectedTeamForSquad ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}>{tab}</button>
           ))}
       </div>
@@ -375,14 +388,34 @@ export const TournamentAdmin: React.FC = () => {
                                     ))}
                                 </div>
                             ))}
+                            {teams.length === 0 && (
+                                <div className="text-center py-10 text-slate-400 italic">No teams registered yet.</div>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
             {view === 'matches' && (
                 <div className="animate-fade-in-up">
-                     <div className="flex justify-end mb-6"><button onClick={() => setShowScheduler(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2"><Plus size={18}/> Schedule Match</button></div>
+                     <div className="flex justify-end mb-6">
+                        <button 
+                            onClick={() => {
+                                setSchedData({
+                                    id: '',
+                                    teamA: '', teamB: '',
+                                    date: new Date().toISOString().split('T')[0],
+                                    time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage',
+                                    stageType: 'group'
+                                });
+                                setShowScheduler(true);
+                            }} 
+                            className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2"
+                        >
+                            <Plus size={18}/> Schedule Match
+                        </button>
+                     </div>
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {/* Use the prioritized sortedMatches list in the admin view too */}
                         {sortedMatches.map(m => (
                             <MatchCard 
                                 key={m.id} 
@@ -392,101 +425,26 @@ export const TournamentAdmin: React.FC = () => {
                                 isAdmin={true} 
                                 onClick={() => setActiveMatch(m)} 
                                 onDelete={(e, mid) => handleDeleteMatch(mid)}
-                                onEdit={(e, match) => { setShowScheduler(true); setSchedData({ ...schedData, teamA: match.teamAId, teamB: match.teamBId, date: match.date, time: match.time, overs: match.totalOvers, type: match.type, groupStage: match.groupStage, stageType: match.stageType || 'group' }); }}
+                                onEdit={(e, match) => { 
+                                    setSchedData({ 
+                                        id: match.id,
+                                        teamA: match.teamAId, 
+                                        teamB: match.teamBId, 
+                                        date: match.date, 
+                                        time: match.time, 
+                                        overs: match.totalOvers, 
+                                        type: match.type, 
+                                        groupStage: match.groupStage, 
+                                        stageType: match.stageType || 'group' 
+                                    });
+                                    setShowScheduler(true); 
+                                }}
                             />
                         ))}
+                        {matches.length === 0 && (
+                            <div className="col-span-full py-20 text-center text-slate-400 italic">No matches scheduled yet.</div>
+                        )}
                      </div>
-                </div>
-            )}
-            {view === 'awards' && (
-                <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up">
-                    <div className="bg-white p-8 rounded-3xl border shadow-xl">
-                        <div className="flex items-center gap-3 mb-8">
-                            <Trophy className="text-yellow-500" size={32} />
-                            <h3 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Tournament Awards</h3>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Champion Team</label>
-                                <select 
-                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
-                                    value={tournament.seriesAwards?.championTeamId || ''}
-                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), championTeamId: e.target.value}})}
-                                >
-                                    <option value="">Select Champion...</option>
-                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Runners Up Team</label>
-                                <select 
-                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
-                                    value={tournament.seriesAwards?.runnersUpTeamId || ''}
-                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), runnersUpTeamId: e.target.value}})}
-                                >
-                                    <option value="">Select Runners Up...</option>
-                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Man of the Series</label>
-                                <select 
-                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
-                                    value={tournament.seriesAwards?.playerOfSeries || ''}
-                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), playerOfSeries: e.target.value}})}
-                                >
-                                    <option value="">Select Player...</option>
-                                    {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Best Batsman (Top Run Scorer)</label>
-                                <select 
-                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
-                                    value={tournament.seriesAwards?.bestBatsman || ''}
-                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), bestBatsman: e.target.value}})}
-                                >
-                                    <option value="">Select Player...</option>
-                                    {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Best Bowler (Top Wicket Taker)</label>
-                                <select 
-                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
-                                    value={tournament.seriesAwards?.bestBowler || ''}
-                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), bestBowler: e.target.value}})}
-                                >
-                                    <option value="">Select Player...</option>
-                                    {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>)}
-                                </select>
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Additional Notes / Emergency Info</label>
-                                <textarea 
-                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-medium min-h-[100px]"
-                                    placeholder="Any special mentions or tournament notes..."
-                                    value={tournament.seriesAwards?.emergencyNotes || ''}
-                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), emergencyNotes: e.target.value}})}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-8 pt-6 border-t flex justify-end">
-                            <button 
-                                onClick={handleSaveAwards}
-                                className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-100 flex items-center gap-2"
-                            >
-                                <Save size={18} /> Save All Awards
-                            </button>
-                        </div>
-                    </div>
                 </div>
             )}
         </>
@@ -549,7 +507,7 @@ export const TournamentAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4">
               <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-fade-in-up">
                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-black text-slate-900 uppercase">Match Settings</h3>
+                      <h3 className="text-2xl font-black text-slate-900 uppercase">{schedData.id ? 'Edit Match' : 'Match Settings'}</h3>
                       <button onClick={() => setShowScheduler(false)} className="p-2 text-slate-400"><X size={24}/></button>
                   </div>
                   <form onSubmit={handleCreateMatch} className="space-y-5">
@@ -598,7 +556,9 @@ export const TournamentAdmin: React.FC = () => {
                           <input type="date" value={schedData.date} onChange={(e) => setSchedData({...schedData, date: e.target.value})} className="w-full border rounded-xl px-4 py-3"/>
                       </div>
 
-                      <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 mt-4">Confirm Schedule</button>
+                      <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 mt-4">
+                        {schedData.id ? 'Update Match Details' : 'Confirm Schedule'}
+                      </button>
                   </form>
               </div>
           </div>
