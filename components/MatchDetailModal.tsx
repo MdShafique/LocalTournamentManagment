@@ -17,8 +17,9 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
     const battingTeam = teamKey === 'A' ? teamA : teamB;
     const bowlingTeam = teamKey === 'A' ? teamB : teamA;
     
-    const battingInnings = match.scorecard?.[teamKey] || { batting: [], bowling: [], extras: { wide: 0, noBall: 0, bye: 0, legBye: 0 } };
-    const bowlingInnings = teamKey === 'A' ? match.scorecard?.B : match.scorecard?.A;
+    const battingInnings = (match.scorecard && match.scorecard[teamKey]) || { batting: [], bowling: [], extras: { wide: 0, noBall: 0, bye: 0, legBye: 0 } };
+    const otherKey = teamKey === 'A' ? 'B' : 'A';
+    const bowlingInnings = (match.scorecard && match.scorecard[otherKey]);
     const bowlingStats = bowlingInnings?.bowling || [];
     
     const ex = battingInnings.extras || { wide: 0, noBall: 0, bye: 0, legBye: 0 };
@@ -62,10 +63,22 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
                 ))}
               </tbody>
               <tfoot className="bg-slate-50/50 font-black border-t">
+                {/* Extras Row - Aligned with R column */}
+                <tr className="border-b border-slate-100">
+                  <td className="px-2 py-2 sm:px-5 font-bold text-slate-400 uppercase text-[8px] sm:text-[9px]">
+                    Extras
+                  </td>
+                  <td className="px-0.5 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-sm">
+                    {totalExtras}
+                  </td>
+                  <td colSpan={4} className="px-2 py-2 text-left text-[7px] sm:text-[9px] text-slate-300 font-normal lowercase tracking-tight">
+                    (w {ex.wide}, nb {ex.noBall}, b {ex.bye}, lb {ex.legBye})
+                  </td>
+                </tr>
+                {/* Total Row */}
                 <tr className="bg-emerald-50/30">
                   <td className="px-2 py-3 sm:px-5 truncate">
                     <span className="text-emerald-800 uppercase tracking-widest text-[8px] sm:text-[10px]">Total Score</span>
-                    <div className="text-[7px] text-slate-400 font-bold uppercase mt-0.5">Extras: {totalExtras}</div>
                   </td>
                   <td className="px-0.5 py-3 text-center text-base sm:text-2xl font-black text-emerald-700">{scoreSummary.runs}/{scoreSummary.wickets}</td>
                   <td className="px-2 py-3 text-right text-[8px] sm:text-[10px] font-black text-emerald-600 uppercase" colSpan={4}>({scoreSummary.overs})</td>

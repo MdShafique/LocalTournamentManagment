@@ -7,7 +7,7 @@ import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
 import { PlayerDetailModal } from '../components/PlayerDetailModal';
-import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award } from 'lucide-react';
+import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
 interface TopBatsman {
@@ -208,7 +208,7 @@ export const PublicView: React.FC = () => {
 
   return (
     <Layout title={tournament.name}>
-      {/* Pill Style Navigation - No Underline */}
+      {/* Pill Style Navigation */}
       <div className="flex overflow-x-auto gap-2 p-1 mb-6 sticky top-16 bg-slate-50/90 backdrop-blur-md z-40 no-scrollbar items-center">
           {[
               { id: 'matches', label: 'Matches', icon: Activity },
@@ -243,6 +243,38 @@ export const PublicView: React.FC = () => {
                               const tA = teams.find(t => t.id === m.teamAId);
                               const tB = teams.find(t => t.id === m.teamBId);
                               if (!tA || !tB) return null;
+                              
+                              // Detect Innings Break
+                              const isInningsBreak = m.scoreA.balls > 0 && 
+                                (m.scoreA.wickets === 10 || m.scoreA.balls === m.totalOvers * 6 || m.scoreA.isDeclared) && 
+                                m.scoreB.balls === 0 && m.status !== MatchStatus.COMPLETED;
+
+                              if (isInningsBreak) {
+                                return (
+                                  <div key={m.id} onClick={() => setSelectedMatch(m)} className="cursor-pointer mb-6 group">
+                                     <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 text-white shadow-2xl relative overflow-hidden border border-white/10 group-hover:scale-[1.01] transition-transform">
+                                        {/* <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Coffee size={160} /></div> */}
+                                        <div className="relative z-10 flex flex-col items-center text-center">
+                                            <div className="px-4 py-1 bg-yellow-400 text-yellow-900 rounded-full font-black text-[12px] uppercase tracking-[0.2em] mb-4">Innings Break</div>
+                                            <h3 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter mb-2">{tA.name} Innings End</h3>
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <div className="text-4xl sm:text-6xl font-black text-white">{m.scoreA.runs}/{m.scoreA.wickets}</div>
+                                                <div className="text-emerald-400 font-black text-sm sm:text-xl">({m.scoreA.overs} OVERS)</div>
+                                            </div>
+                                            <div className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-4 rounded-3xl">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-1">Target for {tB.name}</p>
+                                                <p className="text-3xl font-black text-yellow-400 tracking-tighter">{m.scoreA.runs + 1} RUNS</p>
+                                            </div>
+                                            <div className="mt-8 flex items-center gap-2 text-white/40 animate-pulse">
+                                               <Zap size={14} className="text-emerald-500 fill-emerald-500" />
+                                               <p className="text-[9px] font-black uppercase tracking-[0.4em]">Waiting for 2nd Innings to Start</p>
+                                            </div>
+                                        </div>
+                                     </div>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div key={m.id} onClick={() => setSelectedMatch(m)} className="cursor-pointer transition-transform hover:scale-[1.01] mb-6">
                                   <LiveDetailedCard match={m} teamA={tA} teamB={tB} />
@@ -286,39 +318,39 @@ export const PublicView: React.FC = () => {
               <div className="space-y-10 animate-fade-in-up px-1">
                   {Object.entries(groupedTables).map(([groupName, rows]) => (
                       <div key={groupName}>
-                          <h3 className="text-[10px] font-black text-slate-400 mb-4 flex items-center gap-3 uppercase tracking-widest ml-1">{groupName} Standing</h3>
-                          <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-                            <div className="overflow-x-auto no-scrollbar">
-                                <table className="w-full text-[10px] sm:text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 uppercase text-[8px] sm:text-[10px] font-black tracking-widest">
+                          <h3 className="text-[10px] font-black text-slate-400 mb-3 flex items-center gap-2 uppercase tracking-widest ml-1">{groupName} Standing</h3>
+                          <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden w-full">
+                                <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
+                                    <thead className="bg-slate-50 text-slate-500 uppercase text-[8px] sm:text-[9px] font-black tracking-widest">
                                         <tr>
-                                            <th className="px-3 py-4 sm:px-8 sm:py-5">Team</th>
-                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">P</th>
-                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">W</th>
-                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">L</th>
-                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">T</th>
-                                            <th className="px-3 py-4 sm:px-6 sm:py-5 text-center bg-slate-100/30">Pts</th>
-                                            <th className="px-2 py-4 sm:px-5 sm:py-5 text-center">NRR</th>
+                                            <th className="px-3 py-4 sm:px-8 w-auto">Team</th>
+                                            <th className="px-1 py-4 text-center w-6 sm:w-10">P</th>
+                                            <th className="px-1 py-4 text-center w-6 sm:w-10">W</th>
+                                            <th className="px-1 py-4 text-center w-6 sm:w-10">L</th>
+                                            <th className="px-1 py-4 text-center w-6 sm:w-10">T</th>
+                                            <th className="px-1 py-4 text-center bg-slate-100/30 w-10 sm:w-16">PTS</th>
+                                            <th className="px-2 py-4 text-center w-14 sm:w-24">NRR</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {(rows as TableRow[]).map((row, idx) => (
-                                            <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
-                                                <td className="px-3 py-4 sm:px-8 sm:py-5 font-black text-slate-900 truncate max-w-[85px] sm:max-w-none">
-                                                    <span className="text-slate-300 italic mr-1 sm:mr-2">{idx + 1}</span> 
-                                                    {row.teamName}
-                                                </td>
-                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">{row.played}</td>
-                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center text-emerald-600 font-bold">{row.won}</td>
-                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center text-red-500 font-bold">{row.lost}</td>
-                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center text-blue-500 font-black">{row.tied}</td>
-                                                <td className="px-3 py-4 sm:px-6 sm:py-5 text-center font-black bg-slate-50/50">{row.points}</td>
-                                                <td className="px-2 py-4 sm:px-5 sm:py-5 text-center font-mono text-[9px] sm:text-[10px]">{row.nrr.toFixed(3)}</td>
-                                            </tr>
+                                          <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
+                                              <td className="px-3 py-4 font-black text-slate-900 truncate">
+                                                  <div className="flex items-center gap-1 sm:gap-2 truncate">
+                                                      <span className="text-slate-300 italic hidden xs:inline">{idx + 1}</span> 
+                                                      <span className="truncate">{row.teamName}</span>
+                                                  </div>
+                                              </td>
+                                              <td className="px-1 py-4 text-center">{row.played}</td>
+                                              <td className="px-1 py-4 text-center text-emerald-600 font-bold">{row.won}</td>
+                                              <td className="px-1 py-4 text-center text-red-500 font-bold">{row.lost}</td>
+                                              <td className="px-1 py-4 text-center text-blue-500 font-black">{row.tied}</td>
+                                              <td className="px-1 py-4 text-center font-black bg-slate-50/50">{row.points}</td>
+                                              <td className="px-2 py-4 text-center font-mono text-[9px] sm:text-[10px]">{row.nrr.toFixed(3)}</td>
+                                          </tr>
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
                           </div>
                       </div>
                   ))}
@@ -354,7 +386,6 @@ export const PublicView: React.FC = () => {
           {activeTab === 'stats' && (
               <div className="space-y-12 sm:space-y-16 animate-fade-in-up px-1">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12">
-                      {/* Orange Cap Leaderboard */}
                       <div className="space-y-6 sm:space-y-8">
                           <div className="flex items-center gap-3 px-1">
                             <div className="p-2 bg-orange-100 text-orange-600 rounded-xl shadow-sm"><Star size={20} fill="currentColor"/></div>
@@ -366,7 +397,6 @@ export const PublicView: React.FC = () => {
 
                           {topStats.topBatsmen.length > 0 ? (
                               <div className="space-y-4 sm:space-y-6">
-                                  {/* Hero Card for #1 */}
                                   <div onClick={() => handlePlayerClick(topStats.topBatsmen[0].id, topStats.topBatsmen[0].teamId)} className="cursor-pointer bg-gradient-to-br from-orange-500 to-orange-700 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.01]">
                                       <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-7xl sm:text-9xl pointer-events-none">1</div>
                                       <div className="relative z-10 flex items-center gap-6 sm:gap-8">
@@ -386,8 +416,6 @@ export const PublicView: React.FC = () => {
                                           </div>
                                       </div>
                                   </div>
-
-                                  {/* List for 2-10 */}
                                   <div className="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
                                       {topStats.topBatsmen.slice(1).map((p, i) => (
                                           <button key={p.id} onClick={() => handlePlayerClick(p.id, p.teamId)} className="w-full px-5 py-4 sm:px-8 sm:py-5 flex justify-between items-center border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-all text-left group">
@@ -412,7 +440,6 @@ export const PublicView: React.FC = () => {
                           ) : <div className="p-12 text-center text-slate-400 bg-white rounded-[2rem] border border-dashed border-slate-200">No batting stats available yet.</div>}
                       </div>
 
-                      {/* Purple Cap Leaderboard */}
                       <div className="space-y-6 sm:space-y-8">
                           <div className="flex items-center gap-3 px-1">
                             <div className="p-2 bg-purple-100 text-purple-600 rounded-xl shadow-sm"><Shield size={20} fill="currentColor"/></div>
@@ -424,7 +451,6 @@ export const PublicView: React.FC = () => {
 
                           {topStats.topBowlers.length > 0 ? (
                               <div className="space-y-4 sm:space-y-6">
-                                  {/* Hero Card for #1 */}
                                   <div onClick={() => handlePlayerClick(topStats.topBowlers[0].id, topStats.topBowlers[0].teamId)} className="cursor-pointer bg-gradient-to-br from-purple-600 to-purple-800 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.01]">
                                       <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-7xl sm:text-9xl pointer-events-none">1</div>
                                       <div className="relative z-10 flex items-center gap-6 sm:gap-8">
@@ -444,8 +470,6 @@ export const PublicView: React.FC = () => {
                                           </div>
                                       </div>
                                   </div>
-
-                                  {/* List for 2-10 */}
                                   <div className="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
                                       {topStats.topBowlers.slice(1).map((p, i) => (
                                           <button key={p.id} onClick={() => handlePlayerClick(p.id, p.teamId)} className="w-full px-5 py-4 sm:px-8 sm:py-5 flex justify-between items-center border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-all text-left group">
