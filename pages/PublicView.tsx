@@ -168,31 +168,31 @@ export const PublicView: React.FC = () => {
   const AwardCard = ({ title, playerInfo, teamInfo, icon: Icon, colorClass }: any) => {
     if (!playerInfo && !teamInfo) return null;
     return (
-      <div className={`relative group overflow-hidden rounded-[2.5rem] bg-gradient-to-br ${colorClass} p-8 text-white shadow-2xl transition-all hover:scale-[1.03] animate-fade-in-up`}>
+      <div className={`relative group overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-br ${colorClass} p-6 sm:p-8 text-white shadow-2xl transition-all hover:scale-[1.03] animate-fade-in-up`}>
           <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-              <Icon size={160} />
+              <Icon size={120} />
           </div>
           <div className="relative z-10">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">{title}</p>
-              <div className="flex items-center gap-6">
-                  <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl bg-white/20 border-4 border-white/30 overflow-hidden shadow-2xl shrink-0">
+              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">{title}</p>
+              <div className="flex items-center gap-4 sm:gap-6">
+                  <div className="w-20 h-20 sm:w-32 sm:h-32 rounded-2xl sm:rounded-3xl bg-white/20 border-4 border-white/30 overflow-hidden shadow-2xl shrink-0">
                       {playerInfo?.player?.image || teamInfo?.logo ? (
                           <img src={playerInfo?.player?.image || teamInfo?.logo} className="w-full h-full object-cover" alt="Awardee" />
                       ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl font-black text-white/40">
+                          <div className="w-full h-full flex items-center justify-center text-3xl sm:text-4xl font-black text-white/40">
                               {(playerInfo?.player?.name || teamInfo?.name || "?")[0]}
                           </div>
                       )}
                   </div>
-                  <div>
-                      <h4 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter leading-tight mb-1">
+                  <div className="min-w-0">
+                      <h4 className="text-xl sm:text-4xl font-black uppercase tracking-tighter leading-tight mb-1 truncate">
                           {playerInfo?.player?.name || teamInfo?.name}
                       </h4>
-                      <p className="text-sm font-bold opacity-80 uppercase tracking-widest">
+                      <p className="text-xs font-bold opacity-80 uppercase tracking-widest truncate">
                           {playerInfo?.team?.name || teamInfo?.group || "Tournament Star"}
                       </p>
                       {playerInfo?.player?.role && (
-                        <span className="inline-block mt-3 px-3 py-1 bg-white/10 rounded-full text-[9px] font-black uppercase tracking-widest border border-white/10">
+                        <span className="inline-block mt-2 px-2.5 py-1 bg-white/10 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest border border-white/10">
                             {playerInfo.player.role}
                         </span>
                       )}
@@ -208,7 +208,8 @@ export const PublicView: React.FC = () => {
 
   return (
     <Layout title={tournament.name}>
-      <div className="flex overflow-x-auto border-b border-slate-200 mb-8 sticky top-16 bg-slate-50/80 backdrop-blur-md z-40 no-scrollbar">
+      {/* Pill Style Navigation - No Underline */}
+      <div className="flex overflow-x-auto gap-2 p-1 mb-6 sticky top-16 bg-slate-50/90 backdrop-blur-md z-40 no-scrollbar items-center">
           {[
               { id: 'matches', label: 'Matches', icon: Activity },
               { id: 'table', label: 'Standings', icon: Layers },
@@ -216,257 +217,295 @@ export const PublicView: React.FC = () => {
               { id: 'stats', label: 'Leaderboard', icon: BarChart3 },
               { id: 'awards', label: 'Awards', icon: Award }
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-5 font-black text-[11px] uppercase tracking-widest border-b-2 transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === tab.id ? 'border-emerald-600 text-emerald-600 bg-emerald-50/10' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                <tab.icon size={16} /> {tab.label}
+            <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id as any)} 
+                className={`px-5 py-2.5 rounded-full font-bold text-[10px] sm:text-xs uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 border shadow-sm ${
+                    activeTab === tab.id 
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-200 shadow-lg' 
+                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                }`}
+            >
+                <tab.icon size={14} /> {tab.label}
             </button>
           ))}
       </div>
 
-      {activeTab === 'matches' && (
-          <div className="space-y-12 animate-fade-in-up">
-              {sortedMatches.live.length > 0 && (
-                  <div>
-                      <h2 className="flex items-center gap-2 text-[10px] font-black text-red-600 mb-6 tracking-[0.3em] uppercase">
-                          <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span> Match Center (Live)
-                      </h2>
-                      {sortedMatches.live.map(m => {
-                          const tA = teams.find(t => t.id === m.teamAId);
-                          const tB = teams.find(t => t.id === m.teamBId);
-                          if (!tA || !tB) return null;
-                          return (
-                            <div key={m.id} onClick={() => setSelectedMatch(m)} className="cursor-pointer transition-transform hover:scale-[1.01] mb-6">
-                              <LiveDetailedCard match={m} teamA={tA} teamB={tB} />
+      <div className="max-w-full overflow-x-hidden">
+          {activeTab === 'matches' && (
+              <div className="space-y-8 sm:space-y-12 animate-fade-in-up px-1">
+                  {sortedMatches.live.length > 0 && (
+                      <div className="mb-8">
+                          <h2 className="flex items-center gap-2 text-[10px] font-black text-red-600 mb-4 tracking-[0.3em] uppercase ml-1">
+                              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span> Match Center (Live)
+                          </h2>
+                          {sortedMatches.live.map(m => {
+                              const tA = teams.find(t => t.id === m.teamAId);
+                              const tB = teams.find(t => t.id === m.teamBId);
+                              if (!tA || !tB) return null;
+                              return (
+                                <div key={m.id} onClick={() => setSelectedMatch(m)} className="cursor-pointer transition-transform hover:scale-[1.01] mb-6">
+                                  <LiveDetailedCard match={m} teamA={tA} teamB={tB} />
+                                </div>
+                              );
+                          })}
+                      </div>
+                  )}
+
+                  {sortedMatches.upcoming.length > 0 && (
+                      <div className="mb-8">
+                          <h3 className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-[0.2em] flex items-center gap-2 ml-1">
+                            <Calendar size={14} className="text-emerald-500" /> Upcoming Matches
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                              {sortedMatches.upcoming.map(m => (
+                                <MatchCard key={m.id} match={m} teamA={teams.find(t => t.id === m.teamAId)} teamB={teams.find(t => t.id === m.teamBId)} onClick={() => setSelectedMatch(m)} />
+                              ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {sortedMatches.results.length > 0 && (
+                      <div className="mb-8">
+                          <h3 className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-[0.2em] flex items-center gap-2 ml-1">
+                            <ChevronRight size={14} /> Recent Results
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                              {sortedMatches.results.map(m => (
+                                <MatchCard key={m.id} match={m} teamA={teams.find(t => t.id === m.teamAId)} teamB={teams.find(t => t.id === m.teamBId)} onClick={() => setSelectedMatch(m)} />
+                              ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {matches.length === 0 && <div className="text-center py-20 text-slate-400 italic">No matches available yet.</div>}
+              </div>
+          )}
+
+          {activeTab === 'table' && (
+              <div className="space-y-10 animate-fade-in-up px-1">
+                  {Object.entries(groupedTables).map(([groupName, rows]) => (
+                      <div key={groupName}>
+                          <h3 className="text-[10px] font-black text-slate-400 mb-4 flex items-center gap-3 uppercase tracking-widest ml-1">{groupName} Standing</h3>
+                          <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
+                            <div className="overflow-x-auto no-scrollbar">
+                                <table className="w-full text-xs sm:text-sm text-left min-w-[450px] sm:min-w-[600px]">
+                                    <thead className="bg-slate-50 text-slate-500 uppercase text-[8px] sm:text-[10px] font-black tracking-widest">
+                                        <tr>
+                                            <th className="px-4 py-4 sm:px-8 sm:py-5">Team</th>
+                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">P</th>
+                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">W</th>
+                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">L</th>
+                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">T</th>
+                                            <th className="px-4 py-4 sm:px-6 sm:py-5 text-center bg-slate-100/30">Pts</th>
+                                            <th className="px-3 py-4 sm:px-5 sm:py-5 text-center">NRR</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {(rows as TableRow[]).map((row, idx) => (
+                                            <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
+                                                <td className="px-4 py-4 sm:px-8 sm:py-5 font-black text-slate-900 truncate max-w-[120px] sm:max-w-none">
+                                                    <span className="text-slate-300 italic mr-2">{idx + 1}</span> 
+                                                    {row.teamName}
+                                                </td>
+                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center">{row.played}</td>
+                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center text-emerald-600 font-bold">{row.won}</td>
+                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center text-red-500 font-bold">{row.lost}</td>
+                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center text-blue-500 font-black">{row.tied}</td>
+                                                <td className="px-4 py-4 sm:px-6 sm:py-5 text-center font-black bg-slate-50/50">{row.points}</td>
+                                                <td className="px-3 py-4 sm:px-5 sm:py-5 text-center font-mono text-[9px] sm:text-[10px]">{row.nrr.toFixed(3)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                          );
-                      })}
-                  </div>
-              )}
-              {sortedMatches.upcoming.length > 0 && (
-                  <div>
-                      <h3 className="text-[10px] font-black text-slate-400 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <Calendar size={14} className="text-emerald-500" /> Upcoming Matches
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                          {sortedMatches.upcoming.map(m => (
-                            <MatchCard key={m.id} match={m} teamA={teams.find(t => t.id === m.teamAId)} teamB={teams.find(t => t.id === m.teamBId)} onClick={() => setSelectedMatch(m)} />
-                          ))}
-                      </div>
-                  </div>
-              )}
-              {sortedMatches.results.length > 0 && (
-                  <div>
-                      <h3 className="text-[10px] font-black text-slate-400 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <ChevronRight size={14} /> Recent Results
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                          {sortedMatches.results.map(m => (
-                            <MatchCard key={m.id} match={m} teamA={teams.find(t => t.id === m.teamAId)} teamB={teams.find(t => t.id === m.teamBId)} onClick={() => setSelectedMatch(m)} />
-                          ))}
-                      </div>
-                  </div>
-              )}
-              {matches.length === 0 && <div className="text-center py-20 text-slate-400 italic">No matches available yet.</div>}
-          </div>
-      )}
-
-      {activeTab === 'table' && (
-          <div className="space-y-12 animate-fade-in-up">
-              {Object.entries(groupedTables).map(([groupName, rows]) => (
-                  <div key={groupName}>
-                      <h3 className="text-xs font-black text-slate-400 mb-5 flex items-center gap-3 uppercase tracking-widest">{groupName} Standing</h3>
-                      <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-black tracking-widest">
-                                <tr>
-                                    <th className="px-8 py-5">Team</th>
-                                    <th className="px-6 py-5 text-center">P</th><th className="px-6 py-5 text-center">W</th><th className="px-6 py-5 text-center">L</th><th className="px-6 py-5 text-center">T</th><th className="px-6 py-5 text-center">NRR</th><th className="px-8 py-5 text-center bg-slate-100/30">Pts</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {rows.map((row, idx) => (
-                                    <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
-                                        <td className="px-8 py-5 font-black text-slate-900"><span className="text-slate-200 mr-3 italic">{idx + 1}</span> {row.teamName}</td>
-                                        <td className="px-6 py-5 text-center">{row.played}</td>
-                                        <td className="px-6 py-5 text-center text-emerald-600">{row.won}</td>
-                                        <td className="px-6 py-5 text-center text-red-500">{row.lost}</td>
-                                        <td className="px-6 py-5 text-center text-blue-500 font-black">{row.tied}</td>
-                                        <td className="px-6 py-5 text-center font-mono text-xs">{row.nrr.toFixed(3)}</td>
-                                        <td className="px-8 py-5 text-center font-black bg-slate-50/50">{row.points}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                      </div>
-                  </div>
-              ))}
-          </div>
-      )}
-
-      {activeTab === 'squads' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in-up">
-              {teams.map(team => (
-                  <div key={team.id} className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-8">
-                      <div className="flex justify-between items-center mb-6 border-b pb-4">
-                          <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">{team.name}</h3>
-                          <span className="text-[10px] bg-slate-900 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest">{team.group}</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {team.players?.map(p => (
-                              <button key={p.id} onClick={() => handlePlayerClick(p.id, team.id)} className="flex items-center gap-3 text-sm bg-slate-50/50 p-3 rounded-2xl border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group">
-                                  <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group-hover:scale-105 transition-transform">
-                                      {p.image ? <img src={p.image} className="w-full h-full object-cover" alt={p.name} /> : <User size={18} className="text-slate-400"/>}
-                                  </div>
-                                  <div className="truncate">
-                                      <p className="font-black text-slate-800 truncate uppercase text-[11px] tracking-tight">{p.name}</p>
-                                      <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">{p.role}</p>
-                                  </div>
-                              </button>
-                          ))}
-                      </div>
-                  </div>
-              ))}
-          </div>
-      )}
-
-      {activeTab === 'stats' && (
-          <div className="space-y-16 animate-fade-in-up">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  <div className="space-y-8">
-                      <div className="flex items-center gap-3 px-2">
-                        <div className="p-2.5 bg-orange-100 text-orange-600 rounded-2xl shadow-sm"><Star size={24} fill="currentColor"/></div>
-                        <div>
-                            <h3 className="font-black text-lg text-slate-900 uppercase tracking-tighter leading-none">Orange Cap</h3>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Leading Run Scorers</p>
-                        </div>
-                      </div>
-                      {topStats.topBatsmen.length > 0 ? (
-                          <div className="space-y-6">
-                              <div onClick={() => handlePlayerClick(topStats.topBatsmen[0].id, topStats.topBatsmen[0].teamId)} className="cursor-pointer bg-gradient-to-br from-orange-500 to-orange-700 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.02]">
-                                  <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-9xl">1</div>
-                                  <div className="relative z-10 flex items-center gap-8">
-                                      <div className="w-32 h-32 rounded-[2rem] bg-white/20 border-4 border-white/30 overflow-hidden shadow-2xl shrink-0">
-                                          {topStats.topBatsmen[0].image ? <img src={topStats.topBatsmen[0].image} className="w-full h-full object-cover" alt={topStats.topBatsmen[0].name}/> : <div className="w-full h-full flex items-center justify-center text-5xl font-black text-white/30">{topStats.topBatsmen[0].name[0]}</div>}
-                                      </div>
-                                      <div>
-                                          <p className="text-orange-100 font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2"><Trophy size={14}/> Top Performer</p>
-                                          <h4 className="text-3xl font-black uppercase tracking-tighter leading-tight">{topStats.topBatsmen[0].name}</h4>
-                                          <p className="text-orange-200 font-bold text-sm uppercase opacity-80 mt-1">{topStats.topBatsmen[0].team}</p>
-                                          <div className="mt-4 flex items-baseline gap-2">
-                                              <span className="text-6xl font-black tracking-tighter leading-none">{topStats.topBatsmen[0].runs}</span>
-                                              <span className="text-xs font-black opacity-60 uppercase tracking-widest">Runs</span>
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-                              <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-                                  {topStats.topBatsmen.slice(1).map((p, i) => (
-                                      <button key={p.id} onClick={() => handlePlayerClick(p.id, p.teamId)} className="w-full px-8 py-5 flex justify-between items-center border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-all text-left group">
-                                          <div className="flex items-center gap-5">
-                                              <span className="font-black text-slate-200 text-lg w-6">{i + 2}</span>
-                                              <div className="w-12 h-12 rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 group-hover:scale-105 transition-transform">
-                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" alt={p.name}/> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-lg">{p.name[0]}</div>}
-                                              </div>
-                                              <div>
-                                                  <p className="font-black text-slate-800 uppercase text-[13px] tracking-tight">{p.name}</p>
-                                                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest truncate max-w-[120px]">{p.team}</p>
-                                              </div>
-                                          </div>
-                                          <div className="text-right">
-                                              <span className="font-black text-orange-600 text-2xl tracking-tighter">{p.runs}</span>
-                                              <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Runs</p>
-                                          </div>
-                                      </button>
-                                  ))}
-                              </div>
                           </div>
-                      ) : <div className="p-12 text-center text-slate-400 bg-white rounded-[2.5rem] border border-dashed border-slate-200">No batting stats available yet.</div>}
-                  </div>
-                  <div className="space-y-8">
-                      <div className="flex items-center gap-3 px-2">
-                        <div className="p-2.5 bg-purple-100 text-purple-600 rounded-2xl shadow-sm"><Shield size={24} fill="currentColor"/></div>
-                        <div>
-                            <h3 className="font-black text-lg text-slate-900 uppercase tracking-tighter leading-none">Purple Cap</h3>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Leading Wicket Takers</p>
-                        </div>
                       </div>
-                      {topStats.topBowlers.length > 0 ? (
-                          <div className="space-y-6">
-                              <div onClick={() => handlePlayerClick(topStats.topBowlers[0].id, topStats.topBowlers[0].teamId)} className="cursor-pointer bg-gradient-to-br from-purple-600 to-purple-800 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.02]">
-                                  <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-9xl">1</div>
-                                  <div className="relative z-10 flex items-center gap-8">
-                                      <div className="w-32 h-32 rounded-[2rem] bg-white/20 border-4 border-white/30 overflow-hidden shadow-2xl shrink-0">
-                                          {topStats.topBowlers[0].image ? <img src={topStats.topBowlers[0].image} className="w-full h-full object-cover" alt={topStats.topBowlers[0].name}/> : <div className="w-full h-full flex items-center justify-center text-5xl font-black text-white/30">{topStats.topBowlers[0].name[0]}</div>}
+                  ))}
+              </div>
+          )}
+
+          {activeTab === 'squads' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 animate-fade-in-up px-1">
+                  {teams.map(team => (
+                      <div key={team.id} className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 p-6 sm:p-8">
+                          <div className="flex justify-between items-center mb-6 border-b pb-4">
+                              <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-tighter truncate max-w-[200px]">{team.name}</h3>
+                              <span className="text-[9px] bg-slate-900 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest">{team.group}</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                              {team.players?.map(p => (
+                                  <button key={p.id} onClick={() => handlePlayerClick(p.id, team.id)} className="flex items-center gap-3 text-sm bg-slate-50/50 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group">
+                                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                                          {p.image ? <img src={p.image} className="w-full h-full object-cover" alt={p.name} /> : <User size={16} className="text-slate-400"/>}
                                       </div>
-                                      <div>
-                                          <p className="text-purple-100 font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2"><Trophy size={14}/> Top Wicket Taker</p>
-                                          <h4 className="text-3xl font-black uppercase tracking-tighter leading-tight">{topStats.topBowlers[0].name}</h4>
-                                          <p className="text-purple-200 font-bold text-sm uppercase opacity-80 mt-1">{topStats.topBowlers[0].team}</p>
-                                          <div className="mt-4 flex items-baseline gap-2">
-                                              <span className="text-6xl font-black tracking-tighter leading-none">{topStats.topBowlers[0].wickets}</span>
-                                              <span className="text-xs font-black opacity-60 uppercase tracking-widest">Wkts</span>
+                                      <div className="truncate">
+                                          <p className="font-black text-slate-800 truncate uppercase text-[10px] sm:text-[11px] tracking-tight">{p.name}</p>
+                                          <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase font-black tracking-widest">{p.role}</p>
+                                      </div>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          )}
+
+          {activeTab === 'stats' && (
+              <div className="space-y-12 sm:space-y-16 animate-fade-in-up px-1">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12">
+                      {/* Orange Cap Leaderboard */}
+                      <div className="space-y-6 sm:space-y-8">
+                          <div className="flex items-center gap-3 px-1">
+                            <div className="p-2 bg-orange-100 text-orange-600 rounded-xl shadow-sm"><Star size={20} fill="currentColor"/></div>
+                            <div>
+                                <h3 className="font-black text-base sm:text-lg text-slate-900 uppercase tracking-tighter leading-none">Orange Cap</h3>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Leading Run Scorers</p>
+                            </div>
+                          </div>
+
+                          {topStats.topBatsmen.length > 0 ? (
+                              <div className="space-y-4 sm:space-y-6">
+                                  {/* Hero Card for #1 */}
+                                  <div onClick={() => handlePlayerClick(topStats.topBatsmen[0].id, topStats.topBatsmen[0].teamId)} className="cursor-pointer bg-gradient-to-br from-orange-500 to-orange-700 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.01]">
+                                      <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-7xl sm:text-9xl pointer-events-none">1</div>
+                                      <div className="relative z-10 flex items-center gap-6 sm:gap-8">
+                                          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl sm:rounded-[2rem] bg-white/20 border-2 sm:border-4 border-white/30 overflow-hidden shadow-2xl shrink-0">
+                                              {topStats.topBatsmen[0].image ? <img src={topStats.topBatsmen[0].image} className="w-full h-full object-cover" alt={topStats.topBatsmen[0].name}/> : <div className="w-full h-full flex items-center justify-center text-4xl sm:text-5xl font-black text-white/30">{topStats.topBatsmen[0].name[0]}</div>}
+                                          </div>
+                                          <div className="min-w-0">
+                                              <p className="text-orange-100 font-black text-[9px] sm:text-xs uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                                  <Trophy size={12}/> Top Performer
+                                              </p>
+                                              <h4 className="text-xl sm:text-3xl font-black uppercase tracking-tighter leading-tight truncate">{topStats.topBatsmen[0].name}</h4>
+                                              <p className="text-orange-200 font-bold text-[10px] sm:text-sm uppercase opacity-80 mt-1 truncate">{topStats.topBatsmen[0].team}</p>
+                                              <div className="mt-3 flex items-baseline gap-1.5">
+                                                  <span className="text-4xl sm:text-6xl font-black tracking-tighter leading-none">{topStats.topBatsmen[0].runs}</span>
+                                                  <span className="text-[9px] font-black opacity-60 uppercase tracking-widest">Runs</span>
+                                              </div>
                                           </div>
                                       </div>
                                   </div>
-                              </div>
-                              <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-                                  {topStats.topBowlers.slice(1).map((p, i) => (
-                                      <button key={p.id} onClick={() => handlePlayerClick(p.id, p.teamId)} className="w-full px-8 py-5 flex justify-between items-center border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-all text-left group">
-                                          <div className="flex items-center gap-5">
-                                              <span className="font-black text-slate-200 text-lg w-6">{i + 2}</span>
-                                              <div className="w-12 h-12 rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 group-hover:scale-105 transition-transform">
-                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" alt={p.name}/> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-lg">{p.name[0]}</div>}
+
+                                  {/* List for 2-10 */}
+                                  <div className="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+                                      {topStats.topBatsmen.slice(1).map((p, i) => (
+                                          <button key={p.id} onClick={() => handlePlayerClick(p.id, p.teamId)} className="w-full px-5 py-4 sm:px-8 sm:py-5 flex justify-between items-center border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-all text-left group">
+                                              <div className="flex items-center gap-4 sm:gap-5">
+                                                  <span className="font-black text-slate-200 text-sm sm:text-lg w-5">{i + 2}</span>
+                                                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 group-hover:scale-105 transition-transform">
+                                                    {p.image ? <img src={p.image} className="w-full h-full object-cover" alt={p.name}/> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-base">{p.name[0]}</div>}
+                                                  </div>
+                                                  <div className="min-w-0">
+                                                      <p className="font-black text-slate-800 uppercase text-[11px] sm:text-[13px] tracking-tight truncate">{p.name}</p>
+                                                      <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-widest truncate max-w-[100px] sm:max-w-[150px]">{p.team}</p>
+                                                  </div>
                                               </div>
-                                              <div>
-                                                  <p className="font-black text-slate-800 uppercase text-[13px] tracking-tight">{p.name}</p>
-                                                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest truncate max-w-[120px]">{p.team}</p>
+                                              <div className="text-right shrink-0">
+                                                  <span className="font-black text-orange-600 text-xl sm:text-2xl tracking-tighter">{p.runs}</span>
+                                                  <p className="text-[7px] sm:text-[8px] font-black text-slate-300 uppercase tracking-widest">Runs</p>
                                               </div>
-                                          </div>
-                                          <div className="text-right">
-                                              <span className="font-black text-purple-600 text-2xl tracking-tighter">{p.wickets}</span>
-                                              <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Wkts</p>
-                                          </div>
-                                      </button>
-                                  ))}
+                                          </button>
+                                      ))}
+                                  </div>
                               </div>
+                          ) : <div className="p-12 text-center text-slate-400 bg-white rounded-[2rem] border border-dashed border-slate-200">No batting stats available yet.</div>}
+                      </div>
+
+                      {/* Purple Cap Leaderboard */}
+                      <div className="space-y-6 sm:space-y-8">
+                          <div className="flex items-center gap-3 px-1">
+                            <div className="p-2 bg-purple-100 text-purple-600 rounded-xl shadow-sm"><Shield size={20} fill="currentColor"/></div>
+                            <div>
+                                <h3 className="font-black text-base sm:text-lg text-slate-900 uppercase tracking-tighter leading-none">Purple Cap</h3>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Leading Wicket Takers</p>
+                            </div>
                           </div>
-                      ) : <div className="p-12 text-center text-slate-400 bg-white rounded-[2.5rem] border border-dashed border-slate-200">No bowling stats available yet.</div>}
+
+                          {topStats.topBowlers.length > 0 ? (
+                              <div className="space-y-4 sm:space-y-6">
+                                  {/* Hero Card for #1 */}
+                                  <div onClick={() => handlePlayerClick(topStats.topBowlers[0].id, topStats.topBowlers[0].teamId)} className="cursor-pointer bg-gradient-to-br from-purple-600 to-purple-800 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.01]">
+                                      <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-7xl sm:text-9xl pointer-events-none">1</div>
+                                      <div className="relative z-10 flex items-center gap-6 sm:gap-8">
+                                          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl sm:rounded-[2rem] bg-white/20 border-2 sm:border-4 border-white/30 overflow-hidden shadow-2xl shrink-0">
+                                              {topStats.topBowlers[0].image ? <img src={topStats.topBowlers[0].image} className="w-full h-full object-cover" alt={topStats.topBowlers[0].name}/> : <div className="w-full h-full flex items-center justify-center text-4xl sm:text-5xl font-black text-white/30">{topStats.topBowlers[0].name[0]}</div>}
+                                          </div>
+                                          <div className="min-w-0">
+                                              <p className="text-purple-100 font-black text-[9px] sm:text-xs uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                                  <Trophy size={12}/> Top Wicket Taker
+                                              </p>
+                                              <h4 className="text-xl sm:text-3xl font-black uppercase tracking-tighter leading-tight truncate">{topStats.topBowlers[0].name}</h4>
+                                              <p className="text-purple-200 font-bold text-[10px] sm:text-sm uppercase opacity-80 mt-1 truncate">{topStats.topBowlers[0].team}</p>
+                                              <div className="mt-3 flex items-baseline gap-1.5">
+                                                  <span className="text-4xl sm:text-6xl font-black tracking-tighter leading-none">{topStats.topBowlers[0].wickets}</span>
+                                                  <span className="text-[9px] font-black opacity-60 uppercase tracking-widest">Wkts</span>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* List for 2-10 */}
+                                  <div className="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+                                      {topStats.topBowlers.slice(1).map((p, i) => (
+                                          <button key={p.id} onClick={() => handlePlayerClick(p.id, p.teamId)} className="w-full px-5 py-4 sm:px-8 sm:py-5 flex justify-between items-center border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-all text-left group">
+                                              <div className="flex items-center gap-4 sm:gap-5">
+                                                  <span className="font-black text-slate-200 text-sm sm:text-lg w-5">{i + 2}</span>
+                                                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 group-hover:scale-105 transition-transform">
+                                                    {p.image ? <img src={p.image} className="w-full h-full object-cover" alt={p.name}/> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-base">{p.name[0]}</div>}
+                                                  </div>
+                                                  <div className="min-w-0">
+                                                      <p className="font-black text-slate-800 uppercase text-[11px] sm:text-[13px] tracking-tight truncate">{p.name}</p>
+                                                      <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-widest truncate max-w-[100px] sm:max-w-[150px]">{p.team}</p>
+                                                  </div>
+                                              </div>
+                                              <div className="text-right shrink-0">
+                                                  <span className="font-black text-purple-600 text-xl sm:text-2xl tracking-tighter">{p.wickets}</span>
+                                                  <p className="text-[7px] sm:text-[8px] font-black text-slate-300 uppercase tracking-widest">Wkts</p>
+                                              </div>
+                                          </button>
+                                      ))}
+                                  </div>
+                              </div>
+                          ) : <div className="p-12 text-center text-slate-400 bg-white rounded-[2rem] border border-dashed border-slate-200">No bowling stats available yet.</div>}
+                      </div>
                   </div>
               </div>
-          </div>
-      )}
+          )}
 
-      {activeTab === 'awards' && (
-          <div className="max-w-5xl mx-auto space-y-10 animate-fade-in-up">
-              {!awardPlayers || (!awardPlayers.champion && !awardPlayers.runnersUp && !awardPlayers.mos && !awardPlayers.bestBat && !awardPlayers.bestBowl) ? (
-                  <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-                      <Award size={64} className="mx-auto text-slate-200 mb-6" />
-                      <h3 className="text-xl font-black text-slate-300 uppercase tracking-widest">Awards Ceremony Pending</h3>
-                      <p className="text-slate-400 mt-2">The winners haven't been announced yet. Stay tuned!</p>
-                  </div>
-              ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="md:col-span-2">
-                          <AwardCard title="Tournament Champion" teamInfo={awardPlayers.champion} icon={Trophy} colorClass="from-yellow-500 to-yellow-700" />
+          {activeTab === 'awards' && (
+              <div className="max-w-5xl mx-auto space-y-10 animate-fade-in-up px-1 pb-10">
+                  {!awardPlayers || (!awardPlayers.champion && !awardPlayers.runnersUp && !awardPlayers.mos && !awardPlayers.bestBat && !awardPlayers.bestBowl) ? (
+                      <div className="text-center py-24 sm:py-32 bg-white rounded-[2.5rem] sm:rounded-[3rem] border-2 border-dashed border-slate-200">
+                          <Award className="mx-auto text-slate-200 mb-6 w-12 h-12 sm:w-16 sm:h-16" />
+                          <h3 className="text-sm sm:text-xl font-black text-slate-300 uppercase tracking-widest">Awards Ceremony Pending</h3>
+                          <p className="text-xs sm:text-slate-400 mt-2">The winners haven't been announced yet.</p>
                       </div>
-                      <div className="md:col-span-2">
-                          <AwardCard title="Runners Up" teamInfo={awardPlayers.runnersUp} icon={Shield} colorClass="from-slate-500 to-slate-700" />
-                      </div>
-                      <AwardCard title="Man of the Series" playerInfo={awardPlayers.mos} icon={Star} colorClass="from-emerald-600 to-emerald-800" />
-                      <AwardCard title="Best Batsman" playerInfo={awardPlayers.bestBat} icon={BarChart3} colorClass="from-orange-500 to-orange-700" />
-                      <AwardCard title="Best Bowler" playerInfo={awardPlayers.bestBowl} icon={Shield} colorClass="from-purple-600 to-purple-800" />
-                      
-                      {tournament.seriesAwards?.emergencyNotes && (
-                          <div className="md:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl">
-                              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-4 flex items-center gap-2">
-                                  <AlertCircle size={14} className="text-emerald-500" /> Tournament Notes
-                              </h3>
-                              <p className="text-slate-600 font-medium whitespace-pre-wrap leading-relaxed">{tournament.seriesAwards.emergencyNotes}</p>
+                  ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                          <div className="md:col-span-2">
+                              <AwardCard title="Tournament Champion" teamInfo={awardPlayers.champion} icon={Trophy} colorClass="from-yellow-500 to-yellow-700" />
                           </div>
-                      )}
-                  </div>
-              )}
-          </div>
-      )}
+                          <div className="md:col-span-2">
+                              <AwardCard title="Runners Up" teamInfo={awardPlayers.runnersUp} icon={Shield} colorClass="from-slate-500 to-slate-700" />
+                          </div>
+                          <AwardCard title="Man of the Series" playerInfo={awardPlayers.mos} icon={Star} colorClass="from-emerald-600 to-emerald-800" />
+                          <AwardCard title="Best Batsman" playerInfo={awardPlayers.bestBat} icon={BarChart3} colorClass="from-orange-500 to-orange-700" />
+                          <AwardCard title="Best Bowler" playerInfo={awardPlayers.bestBowl} icon={Shield} colorClass="from-purple-600 to-purple-800" />
+                          
+                          {tournament.seriesAwards?.emergencyNotes && (
+                              <div className="md:col-span-2 bg-white p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl">
+                                  <h3 className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-4 flex items-center gap-2">
+                                      <AlertCircle size={14} className="text-emerald-500" /> Tournament Notes
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-slate-600 font-medium whitespace-pre-wrap leading-relaxed">{tournament.seriesAwards.emergencyNotes}</p>
+                              </div>
+                          )}
+                      </div>
+                  )}
+              </div>
+          )}
+      </div>
 
       {selectedMatch && (
           <MatchDetailModal 
@@ -477,6 +516,7 @@ export const PublicView: React.FC = () => {
             onPlayerClick={handlePlayerClick}
           />
       )}
+
       {selectedPlayerInfo && (
           <PlayerDetailModal 
             player={selectedPlayerInfo.player} 
