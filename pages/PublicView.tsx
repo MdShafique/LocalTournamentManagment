@@ -289,31 +289,31 @@ export const PublicView: React.FC = () => {
                           <h3 className="text-[10px] font-black text-slate-400 mb-4 flex items-center gap-3 uppercase tracking-widest ml-1">{groupName} Standing</h3>
                           <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
                             <div className="overflow-x-auto no-scrollbar">
-                                <table className="w-full text-xs sm:text-sm text-left min-w-[450px] sm:min-w-[600px]">
+                                <table className="w-full text-[10px] sm:text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-500 uppercase text-[8px] sm:text-[10px] font-black tracking-widest">
                                         <tr>
-                                            <th className="px-4 py-4 sm:px-8 sm:py-5">Team</th>
-                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">P</th>
-                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">W</th>
-                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">L</th>
-                                            <th className="px-2 py-4 sm:px-4 sm:py-5 text-center">T</th>
-                                            <th className="px-4 py-4 sm:px-6 sm:py-5 text-center bg-slate-100/30">Pts</th>
-                                            <th className="px-3 py-4 sm:px-5 sm:py-5 text-center">NRR</th>
+                                            <th className="px-3 py-4 sm:px-8 sm:py-5">Team</th>
+                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">P</th>
+                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">W</th>
+                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">L</th>
+                                            <th className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">T</th>
+                                            <th className="px-3 py-4 sm:px-6 sm:py-5 text-center bg-slate-100/30">Pts</th>
+                                            <th className="px-2 py-4 sm:px-5 sm:py-5 text-center">NRR</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {(rows as TableRow[]).map((row, idx) => (
                                             <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
-                                                <td className="px-4 py-4 sm:px-8 sm:py-5 font-black text-slate-900 truncate max-w-[120px] sm:max-w-none">
-                                                    <span className="text-slate-300 italic mr-2">{idx + 1}</span> 
+                                                <td className="px-3 py-4 sm:px-8 sm:py-5 font-black text-slate-900 truncate max-w-[85px] sm:max-w-none">
+                                                    <span className="text-slate-300 italic mr-1 sm:mr-2">{idx + 1}</span> 
                                                     {row.teamName}
                                                 </td>
-                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center">{row.played}</td>
-                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center text-emerald-600 font-bold">{row.won}</td>
-                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center text-red-500 font-bold">{row.lost}</td>
-                                                <td className="px-2 py-4 sm:px-4 sm:py-5 text-center text-blue-500 font-black">{row.tied}</td>
-                                                <td className="px-4 py-4 sm:px-6 sm:py-5 text-center font-black bg-slate-50/50">{row.points}</td>
-                                                <td className="px-3 py-4 sm:px-5 sm:py-5 text-center font-mono text-[9px] sm:text-[10px]">{row.nrr.toFixed(3)}</td>
+                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center">{row.played}</td>
+                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center text-emerald-600 font-bold">{row.won}</td>
+                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center text-red-500 font-bold">{row.lost}</td>
+                                                <td className="px-1.5 py-4 sm:px-4 sm:py-5 text-center text-blue-500 font-black">{row.tied}</td>
+                                                <td className="px-3 py-4 sm:px-6 sm:py-5 text-center font-black bg-slate-50/50">{row.points}</td>
+                                                <td className="px-2 py-4 sm:px-5 sm:py-5 text-center font-mono text-[9px] sm:text-[10px]">{row.nrr.toFixed(3)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
