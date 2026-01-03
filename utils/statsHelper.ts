@@ -55,11 +55,14 @@ export const calculateTable = (teams: Team[], matches: Match[]): Record<string, 
       const nrrB = nrrStats[m.teamBId];
 
       if (nrrA && nrrB) {
+          // Team A batting stats
           nrrA.runsScored += m.scoreA.runs;
+          // If all out, overs are counted as full quota
           nrrA.ballsFaced += (m.scoreA.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreA.overs));
           nrrA.runsConceded += m.scoreB.runs;
           nrrA.ballsBowled += (m.scoreB.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
 
+          // Team B batting stats
           nrrB.runsScored += m.scoreB.runs;
           nrrB.ballsFaced += (m.scoreB.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
           nrrB.runsConceded += m.scoreA.runs;
@@ -86,8 +89,11 @@ export const calculateTable = (teams: Team[], matches: Match[]): Record<string, 
 
   Object.keys(grouped).forEach(key => {
       grouped[key].sort((a, b) => {
-          if (b.points !== a.points) return b.points - a.points;
-          if (b.won !== a.won) return b.won - a.won;
+          // Priority 1: Points (PTS)
+          if (b.points !== a.points) {
+              return b.points - a.points;
+          }
+          // Priority 2: Net Run Rate (NRR) if points are equal
           return b.nrr - a.nrr;
       });
   });
