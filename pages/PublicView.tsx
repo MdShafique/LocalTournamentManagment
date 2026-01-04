@@ -7,7 +7,7 @@ import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
 import { PlayerDetailModal } from '../components/PlayerDetailModal';
-import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap } from 'lucide-react';
+import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap, Info, XCircle, CheckCircle2, MinusCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
 interface TopBatsman {
@@ -40,6 +40,7 @@ export const PublicView: React.FC = () => {
   
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [selectedPlayerInfo, setSelectedPlayerInfo] = useState<{ player: Player, team: Team } | null>(null);
+  const [selectedTeamHistory, setSelectedTeamHistory] = useState<{ team: Team, row: TableRow } | null>(null);
 
   useEffect(() => {
     const loadStaticData = async () => {
@@ -203,6 +204,111 @@ export const PublicView: React.FC = () => {
     );
   };
 
+  const TeamDetailModal = ({ team, row, onClose }: { team: Team, row: TableRow, onClose: () => void }) => {
+    const teamMatches = matches.filter(m => m.teamAId === team.id || m.teamBId === team.id);
+    const completed = teamMatches.filter(m => m.status === MatchStatus.COMPLETED).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const scheduled = teamMatches.filter(m => m.status === MatchStatus.SCHEDULED).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return (
+      <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[100] p-0 sm:p-4 animate-fade-in">
+        <div className="bg-white sm:rounded-[3rem] shadow-2xl w-full h-full sm:h-auto sm:max-w-2xl overflow-hidden animate-fade-in-up">
+          <div className="bg-slate-900 p-8 sm:p-10 text-white relative">
+            <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
+              <XCircle size={24} />
+            </button>
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center text-4xl font-black border border-white/10 overflow-hidden">
+                {team.logo ? <img src={team.logo} className="w-full h-full object-cover" alt="Logo" /> : team.name[0]}
+              </div>
+              <div>
+                <p className="text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-1">{team.group}</p>
+                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">{team.name}</h2>
+                <div className="flex gap-4 mt-3">
+                  <div className="text-center"><p className="text-[10px] text-white/40 font-bold uppercase">Points</p><p className="text-xl font-black text-emerald-400">{row.points}</p></div>
+                  <div className="text-center"><p className="text-[10px] text-white/40 font-bold uppercase">Wins</p><p className="text-xl font-black">{row.won}</p></div>
+                  <div className="text-center"><p className="text-[10px] text-white/40 font-bold uppercase">NRR</p><p className="text-base sm:text-xl font-black text-blue-400">{row.nrr.toFixed(3)}</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6 sm:p-10 max-h-[60vh] overflow-y-auto no-scrollbar">
+             {completed.length > 0 && (
+               <div className="mb-8">
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2">
+                   <Activity size={14} /> Match History
+                 </h3>
+                 <div className="space-y-3">
+                   {completed.map(m => {
+                     const opponentId = m.teamAId === team.id ? m.teamBId : m.teamAId;
+                     const opponent = teams.find(t => t.id === opponentId);
+                     const isWin = m.winnerId === team.id;
+                     const isTie = m.winnerId === 'TIED';
+                     return (
+                       <div key={m.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                         <div className="flex items-center gap-4 min-w-0">
+                           <div className={`p-2 rounded-xl shrink-0 ${isWin ? 'bg-emerald-100 text-emerald-600' : (isTie ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600')}`}>
+                             {isWin ? <CheckCircle2 size={20} /> : (isTie ? <MinusCircle size={20} /> : <XCircle size={20} />)}
+                           </div>
+                           <div className="truncate">
+                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{m.groupStage}</p>
+                             <p className="font-black text-slate-800 truncate">vs {opponent?.name || "Unknown Team"}</p>
+                           </div>
+                         </div>
+                         <div className="text-right shrink-0">
+                           <p className="text-sm font-black text-slate-900">
+                             {m.teamAId === team.id ? `${m.scoreA.runs}/${m.scoreA.wickets}` : `${m.scoreB.runs}/${m.scoreB.wickets}`}
+                             <span className="text-slate-300 mx-1">-</span>
+                             {m.teamAId === team.id ? `${m.scoreB.runs}/${m.scoreB.wickets}` : `${m.scoreA.runs}/${m.scoreA.wickets}`}
+                           </p>
+                           <p className={`text-[9px] font-black uppercase ${isWin ? 'text-emerald-600' : (isTie ? 'text-blue-600' : 'text-red-500')}`}>
+                             {isWin ? "Win" : (isTie ? "Tied" : "Loss")}
+                           </p>
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               </div>
+             )}
+
+             {scheduled.length > 0 && (
+               <div>
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2">
+                   <Calendar size={14} /> Upcoming Fixtures
+                 </h3>
+                 <div className="space-y-3">
+                   {scheduled.map(m => {
+                     const opponentId = m.teamAId === team.id ? m.teamBId : m.teamAId;
+                     const opponent = teams.find(t => t.id === opponentId);
+                     return (
+                       <div key={m.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                         <div className="truncate">
+                           <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">{m.date} @ {m.time}</p>
+                           <p className="font-black text-slate-800 truncate">vs {opponent?.name}</p>
+                         </div>
+                         <div className="text-[9px] bg-slate-100 px-2.5 py-1 rounded-full font-black text-slate-500 uppercase shrink-0">
+                           {m.venue}
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               </div>
+             )}
+             
+             {teamMatches.length === 0 && (
+               <div className="text-center py-10 text-slate-400 italic">No matches recorded for this team yet.</div>
+             )}
+          </div>
+          <div className="p-6 bg-slate-50 text-center border-t border-slate-100">
+             <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Team Performance Analytics • CricManage Pro</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (error) return <Layout><div className="flex flex-col items-center justify-center pt-20 text-slate-500"><AlertCircle size={48} className="text-red-400 mb-4"/><h2>Oops! {error}</h2></div></Layout>;
   if (loading || !tournament) return <Layout><div className="flex flex-col items-center justify-center mt-20 gap-3"><Loader2 className="animate-spin text-emerald-600" size={40}/><p className="text-slate-500 uppercase text-[10px] font-black tracking-widest">CricManage Engine...</p></div></Layout>;
 
@@ -253,7 +359,6 @@ export const PublicView: React.FC = () => {
                                 return (
                                   <div key={m.id} onClick={() => setSelectedMatch(m)} className="cursor-pointer mb-6 group">
                                      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 text-white shadow-2xl relative overflow-hidden border border-white/10 group-hover:scale-[1.01] transition-transform">
-                                        {/* <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Coffee size={160} /></div> */}
                                         <div className="relative z-10 flex flex-col items-center text-center">
                                             <div className="px-4 py-1 bg-yellow-400 text-yellow-900 rounded-full font-black text-[12px] uppercase tracking-[0.2em] mb-4">Innings Break</div>
                                             <h3 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter mb-2">{tA.name} Innings End</h3>
@@ -316,9 +421,12 @@ export const PublicView: React.FC = () => {
 
           {activeTab === 'table' && (
               <div className="space-y-10 animate-fade-in-up px-1">
-                  {Object.entries(groupedTables).map(([groupName, rows]) => (
+                  {(Object.entries(groupedTables) as [string, TableRow[]][]).map(([groupName, rows]) => (
                       <div key={groupName}>
-                          <h3 className="text-[10px] font-black text-slate-400 mb-3 flex items-center gap-2 uppercase tracking-widest ml-1">{groupName} Standing</h3>
+                          <div className="flex items-center justify-between mb-3 ml-1">
+                            <h3 className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">{groupName} Standing</h3>
+                            <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1"><Info size={10} /> Click team for history</p>
+                          </div>
                           <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden w-full">
                                 <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
                                     <thead className="bg-slate-50 text-slate-500 uppercase text-[8px] sm:text-[9px] font-black tracking-widest">
@@ -333,12 +441,19 @@ export const PublicView: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {(rows as TableRow[]).map((row, idx) => (
-                                          <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
+                                        {rows.map((row, idx) => (
+                                          <tr 
+                                            key={row.teamId} 
+                                            onClick={() => {
+                                                const team = teams.find(t => t.id === row.teamId);
+                                                if (team) setSelectedTeamHistory({ team, row });
+                                            }}
+                                            className="hover:bg-emerald-50/30 transition-colors cursor-pointer group"
+                                          >
                                               <td className="px-3 py-4 font-black text-slate-900 truncate">
                                                   <div className="flex items-center gap-1 sm:gap-2 truncate">
-                                                      <span className="text-slate-300 italic hidden xs:inline">{idx + 1}</span> 
-                                                      <span className="truncate">{row.teamName}</span>
+                                                      <span className="text-slate-300 italic hidden xs:inline group-hover:text-emerald-300">{idx + 1}</span> 
+                                                      <span className="truncate group-hover:text-emerald-700 underline decoration-transparent group-hover:decoration-emerald-200 underline-offset-4">{row.teamName}</span>
                                                   </div>
                                               </td>
                                               <td className="px-1 py-4 text-center">{row.played}</td>
@@ -547,6 +662,14 @@ export const PublicView: React.FC = () => {
             team={selectedPlayerInfo.team} 
             matches={matches} 
             onClose={() => setSelectedPlayerInfo(null)}
+          />
+      )}
+
+      {selectedTeamHistory && (
+          <TeamDetailModal 
+            team={selectedTeamHistory.team}
+            row={selectedTeamHistory.row}
+            onClose={() => setSelectedTeamHistory(null)}
           />
       )}
     </Layout>
