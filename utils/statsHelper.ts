@@ -55,14 +55,11 @@ export const calculateTable = (teams: Team[], matches: Match[]): Record<string, 
       const nrrB = nrrStats[m.teamBId];
 
       if (nrrA && nrrB) {
-          // Team A batting stats
           nrrA.runsScored += m.scoreA.runs;
-          // If all out, overs are counted as full quota
           nrrA.ballsFaced += (m.scoreA.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreA.overs));
           nrrA.runsConceded += m.scoreB.runs;
           nrrA.ballsBowled += (m.scoreB.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
 
-          // Team B batting stats
           nrrB.runsScored += m.scoreB.runs;
           nrrB.ballsFaced += (m.scoreB.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
           nrrB.runsConceded += m.scoreA.runs;
@@ -89,11 +86,8 @@ export const calculateTable = (teams: Team[], matches: Match[]): Record<string, 
 
   Object.keys(grouped).forEach(key => {
       grouped[key].sort((a, b) => {
-          // Priority 1: Points (PTS)
-          if (b.points !== a.points) {
-              return b.points - a.points;
-          }
-          // Priority 2: Net Run Rate (NRR) if points are equal
+          if (b.points !== a.points) return b.points - a.points;
+          if (b.won !== a.won) return b.won - a.won;
           return b.nrr - a.nrr;
       });
   });
@@ -122,6 +116,7 @@ export const getInningsProgress = (match: Match, teamKey: 'A' | 'B'): number[] =
 };
 
 export interface PlayerAggregateStats {
+    matchesPlayed: number;
     inningsBat: number;
     runs: number;
     balls: number;
@@ -135,10 +130,11 @@ export interface PlayerAggregateStats {
     ballsBowled: number;
     economy: number;
     maidens: number;
+    bowlingAverage: number;
 }
 
 export const calculatePlayerAggregateStats = (playerId: string, matches: Match[]): PlayerAggregateStats => {
-    let runs = 0, balls = 0, dismissals = 0, highest = 0, inningsBat = 0;
+    let runs = 0, balls = 0, dismissals = 0, highest = 0, inningsBat = 0, matchesPlayed = 0;
     let wickets = 0, runsConceded = 0, ballsBowled = 0, inningsBowl = 0, maidens = 0;
 
     matches.forEach(m => {
@@ -146,31 +142,47 @@ export const calculatePlayerAggregateStats = (playerId: string, matches: Match[]
         const batA = m.scorecard.A.batting.find(p => p.playerId === playerId);
         const batB = m.scorecard.B.batting.find(p => p.playerId === playerId);
         const bat = batA || batB;
-        if (bat) {
-            inningsBat++;
-            runs += (bat.runs || 0);
-            balls += (bat.balls || 0);
-            if (bat.isOut) dismissals++;
-            if (bat.runs > highest) highest = bat.runs;
-        }
+        
         const bowlA = m.scorecard.A.bowling.find(p => p.playerId === playerId);
         const bowlB = m.scorecard.B.bowling.find(p => p.playerId === playerId);
         const bowl = bowlA || bowlB;
+
+        // Count as match played if present in either batting or bowling list
+        if (bat || bowl) {
+            matchesPlayed++;
+        }
+
+        if (bat) {
+            // Count as innings only if faced a ball or got out
+            if (bat.balls > 0 || bat.isOut) {
+                inningsBat++;
+                runs += (bat.runs || 0);
+                balls += (bat.balls || 0);
+                if (bat.isOut) dismissals++;
+                if (bat.runs > highest) highest = bat.runs;
+            }
+        }
+        
         if (bowl) {
-            inningsBowl++;
-            wickets += (bowl.wickets || 0);
-            runsConceded += (bowl.runsConceded || 0);
-            ballsBowled += (bowl.ballsBowled || 0);
-            maidens += (bowl.maidens || 0);
+            // Count as innings only if bowled at least one ball
+            if (bowl.ballsBowled > 0) {
+                inningsBowl++;
+                wickets += (bowl.wickets || 0);
+                runsConceded += (bowl.runsConceded || 0);
+                ballsBowled += (bowl.ballsBowled || 0);
+                maidens += (bowl.maidens || 0);
+            }
         }
     });
 
     return {
+        matchesPlayed,
         inningsBat, runs, balls, dismissals, highest,
         strikeRate: balls > 0 ? (runs / balls) * 100 : 0,
         average: dismissals > 0 ? runs / dismissals : (inningsBat > 0 ? runs : 0),
         inningsBowl, wickets, runsConceded, ballsBowled,
-        economy: ballsBowled > 0 ? (runsConceded / ballsBowled) * 6 : 0,
-        maidens
+        economy: ballsBowled > 0 ? (runsConceded / (ballsBowled / 6)) : 0,
+        maidens,
+        bowlingAverage: wickets > 0 ? (runsConceded / wickets) : 0
     };
 };

@@ -7,7 +7,7 @@ import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
 import { PlayerDetailModal } from '../components/PlayerDetailModal';
-import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap } from 'lucide-react';
+import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap, X, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
 
 interface TopBatsman {
@@ -28,6 +28,116 @@ interface TopBowler {
   image?: string;
 }
 
+// Sub-component for Team Match History Modal
+const TeamMatchesModal = ({ team, matches, teams, stats, onClose }: { team: Team, matches: Match[], teams: Team[], stats?: TableRow, onClose: () => void }) => {
+    const teamMatches = matches.filter(m => (m.teamAId === team.id || m.teamBId === team.id) && m.status === MatchStatus.COMPLETED);
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-fade-in">
+            <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up border border-white/20">
+                <div className="p-6 sm:p-8 border-b bg-slate-50">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Team Dashboard</p>
+                            <h3 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tighter">{team.name}</h3>
+                        </div>
+                        <button onClick={onClose} className="p-3 bg-white hover:bg-slate-100 rounded-2xl text-slate-400 transition-colors shadow-sm"><X size={20}/></button>
+                    </div>
+
+                    {/* Team Summary Header Stats */}
+                    {stats && (
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-white p-3 rounded-2xl border border-slate-200/60 shadow-inner">
+                            <div className="text-center py-2 px-1 border-r border-slate-100 last:border-0">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">P</p>
+                                <p className="text-sm font-black text-slate-900">{stats.played}</p>
+                            </div>
+                            <div className="text-center py-2 px-1 border-r border-slate-100 last:border-0">
+                                <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">W</p>
+                                <p className="text-sm font-black text-emerald-600">{stats.won}</p>
+                            </div>
+                            <div className="text-center py-2 px-1 border-r border-slate-100 last:border-0">
+                                <p className="text-[8px] font-black text-red-400 uppercase tracking-widest mb-1">L</p>
+                                <p className="text-sm font-black text-red-500">{stats.lost}</p>
+                            </div>
+                            <div className="text-center py-2 px-1 border-r border-slate-100 last:border-0">
+                                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">T</p>
+                                <p className="text-sm font-black text-blue-500">{stats.tied}</p>
+                            </div>
+                            <div className="text-center py-2 px-1 border-r border-slate-100 last:border-0">
+                                <p className="text-[8px] font-black text-orange-400 uppercase tracking-widest mb-1">Pts</p>
+                                <p className="text-sm font-black text-slate-900">{stats.points}</p>
+                            </div>
+                            <div className="text-center py-2 px-1">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">NRR</p>
+                                <p className="text-[10px] font-mono font-bold text-slate-700">{stats.nrr.toFixed(3)}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 sm:p-6 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2 px-1">
+                        <Activity size={10} className="text-emerald-500" /> Match History
+                    </p>
+                    {teamMatches.length === 0 ? (
+                        <div className="text-center py-10 text-slate-400 italic">No matches completed yet.</div>
+                    ) : (
+                        <div className="space-y-4">
+                            {teamMatches.map(m => {
+                                const isWinner = m.winnerId === team.id;
+                                const isTied = m.winnerId === 'TIED' || (m.scoreA.runs === m.scoreB.runs && m.scoreA.runs > 0);
+                                
+                                const teamA = teams.find(t => t.id === m.teamAId);
+                                const teamB = teams.find(t => t.id === m.teamBId);
+                                
+                                return (
+                                    <div key={m.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden group">
+                                        <div className={`absolute top-0 left-0 w-1.5 h-full ${isWinner ? 'bg-emerald-500' : isTied ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+                                        
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${isWinner ? 'bg-emerald-100 text-emerald-700' : isTied ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {isWinner ? 'WON' : isTied ? 'TIED' : 'LOST'}
+                                                </span>
+                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{m.date}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-slate-400">
+                                                {isWinner ? <CheckCircle2 size={14}/> : isTied ? <MinusCircle size={14}/> : <XCircle size={14}/>}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className={`text-xs font-bold truncate pr-2 ${m.teamAId === team.id ? 'text-slate-900' : 'text-slate-500'}`}>
+                                                    {teamA?.name || 'Team A'}
+                                                </span>
+                                                <span className="text-xs font-mono font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-100">
+                                                    {m.scoreA.runs}/{m.scoreA.wickets}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className={`text-xs font-bold truncate pr-2 ${m.teamBId === team.id ? 'text-slate-900' : 'text-slate-500'}`}>
+                                                    {teamB?.name || 'Team B'}
+                                                </span>
+                                                <span className="text-xs font-mono font-black text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-100">
+                                                    {m.scoreB.runs}/{m.scoreB.wickets}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                <div className="p-6 bg-slate-50 border-t text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
+                    CricManage Pro • Tournament Stats
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const PublicView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [tournament, setTournament] = useState<Tournament | undefined>();
@@ -40,6 +150,7 @@ export const PublicView: React.FC = () => {
   
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [selectedPlayerInfo, setSelectedPlayerInfo] = useState<{ player: Player, team: Team } | null>(null);
+  const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
 
   useEffect(() => {
     const loadStaticData = async () => {
@@ -86,6 +197,22 @@ export const PublicView: React.FC = () => {
           setSelectedPlayerInfo({ player, team });
       }
   };
+
+  const handleTeamClickInTable = (teamId: string) => {
+      const team = teams.find(t => t.id === teamId);
+      if (team) {
+          setSelectedTeamForDetails(team);
+      }
+  };
+
+  const selectedTeamStats = useMemo(() => {
+      if (!selectedTeamForDetails) return undefined;
+      for (const groupRows of Object.values(groupedTables)) {
+          const row = groupRows.find(r => r.teamId === selectedTeamForDetails.id);
+          if (row) return row;
+      }
+      return undefined;
+  }, [selectedTeamForDetails, groupedTables]);
 
   const topStats = useMemo(() => {
     const battingStats: Record<string, TopBatsman> = {};
@@ -253,7 +380,6 @@ export const PublicView: React.FC = () => {
                                 return (
                                   <div key={m.id} onClick={() => setSelectedMatch(m)} className="cursor-pointer mb-6 group">
                                      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 text-white shadow-2xl relative overflow-hidden border border-white/10 group-hover:scale-[1.01] transition-transform">
-                                        {/* <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Coffee size={160} /></div> */}
                                         <div className="relative z-10 flex flex-col items-center text-center">
                                             <div className="px-4 py-1 bg-yellow-400 text-yellow-900 rounded-full font-black text-[12px] uppercase tracking-[0.2em] mb-4">Innings Break</div>
                                             <h3 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter mb-2">{tA.name} Innings End</h3>
@@ -267,7 +393,7 @@ export const PublicView: React.FC = () => {
                                             </div>
                                             <div className="mt-8 flex items-center gap-2 text-white/40 animate-pulse">
                                                <Zap size={14} className="text-emerald-500 fill-emerald-500" />
-                                               <p className="text-[9px] font-black uppercase tracking-[0.4em]">Waiting for 2nd Innings to Start</p>
+                                               <p className="text-[9px] font-black uppercase tracking-0.4em]">Waiting for 2nd Innings to Start</p>
                                             </div>
                                         </div>
                                      </div>
@@ -320,33 +446,33 @@ export const PublicView: React.FC = () => {
                       <div key={groupName}>
                           <h3 className="text-[10px] font-black text-slate-400 mb-3 flex items-center gap-2 uppercase tracking-widest ml-1">{groupName} Standing</h3>
                           <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden w-full">
-                                <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
-                                    <thead className="bg-slate-50 text-slate-500 uppercase text-[8px] sm:text-[9px] font-black tracking-widest">
+                                <table className="w-full text-[9px] sm:text-sm text-left table-fixed">
+                                    <thead className="bg-slate-50 text-slate-500 uppercase text-[7px] sm:text-[9px] font-black tracking-widest">
                                         <tr>
-                                            <th className="px-3 py-4 sm:px-8 w-auto">Team</th>
-                                            <th className="px-1 py-4 text-center w-6 sm:w-10">P</th>
-                                            <th className="px-1 py-4 text-center w-6 sm:w-10">W</th>
-                                            <th className="px-1 py-4 text-center w-6 sm:w-10">L</th>
-                                            <th className="px-1 py-4 text-center w-6 sm:w-10">T</th>
-                                            <th className="px-1 py-4 text-center bg-slate-100/30 w-10 sm:w-16">PTS</th>
-                                            <th className="px-2 py-4 text-center w-14 sm:w-24">NRR</th>
+                                            <th className="px-2 py-4 sm:px-6 w-[45%]">Team</th>
+                                            <th className="px-1 py-4 text-center w-[7%]">P</th>
+                                            <th className="px-1 py-4 text-center w-[7%]">W</th>
+                                            <th className="px-1 py-4 text-center w-[7%]">L</th>
+                                            <th className="px-1 py-4 text-center w-[7%]">T</th>
+                                            <th className="px-1 py-4 text-center bg-slate-100/50 w-[10%]">PTS</th>
+                                            <th className="px-1 py-4 text-center w-[17%]">NRR</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {(rows as TableRow[]).map((row, idx) => (
-                                          <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors">
-                                              <td className="px-3 py-4 font-black text-slate-900 truncate">
-                                                  <div className="flex items-center gap-1 sm:gap-2 truncate">
+                                          <tr key={row.teamId} className="hover:bg-emerald-50/30 transition-colors group/row">
+                                              <td className="px-2 py-4 font-black text-slate-900 transition-colors">
+                                                  <button onClick={() => handleTeamClickInTable(row.teamId)} className="flex items-center gap-1 sm:gap-2 truncate text-left hover:text-emerald-600 transition-colors group/team w-full">
                                                       <span className="text-slate-300 italic hidden xs:inline">{idx + 1}</span> 
-                                                      <span className="truncate">{row.teamName}</span>
-                                                  </div>
+                                                      <span className="truncate border-b border-transparent group-hover/team:border-emerald-500/30 font-bold">{row.teamName}</span>
+                                                  </button>
                                               </td>
-                                              <td className="px-1 py-4 text-center">{row.played}</td>
+                                              <td className="px-1 py-4 text-center text-slate-600 font-medium">{row.played}</td>
                                               <td className="px-1 py-4 text-center text-emerald-600 font-bold">{row.won}</td>
                                               <td className="px-1 py-4 text-center text-red-500 font-bold">{row.lost}</td>
                                               <td className="px-1 py-4 text-center text-blue-500 font-black">{row.tied}</td>
-                                              <td className="px-1 py-4 text-center font-black bg-slate-50/50">{row.points}</td>
-                                              <td className="px-2 py-4 text-center font-mono text-[9px] sm:text-[10px]">{row.nrr.toFixed(3)}</td>
+                                              <td className="px-1 py-4 text-center font-black bg-slate-50/50 text-slate-900">{row.points}</td>
+                                              <td className="px-1 py-4 text-center font-mono text-[8px] sm:text-[10px] text-slate-500">{row.nrr.toFixed(3)}</td>
                                           </tr>
                                         ))}
                                     </tbody>
@@ -459,7 +585,7 @@ export const PublicView: React.FC = () => {
                                           </div>
                                           <div className="min-w-0">
                                               <p className="text-purple-100 font-black text-[9px] sm:text-xs uppercase tracking-widest mb-1.5 flex items-center gap-2">
-                                                  <Trophy size={12}/> Top Wicket Taker
+                                                  <Trophy size={12}/> Top Performer
                                               </p>
                                               <h4 className="text-xl sm:text-3xl font-black uppercase tracking-tighter leading-tight truncate">{topStats.topBowlers[0].name}</h4>
                                               <p className="text-purple-200 font-bold text-[10px] sm:text-sm uppercase opacity-80 mt-1 truncate">{topStats.topBowlers[0].team}</p>
@@ -547,6 +673,16 @@ export const PublicView: React.FC = () => {
             team={selectedPlayerInfo.team} 
             matches={matches} 
             onClose={() => setSelectedPlayerInfo(null)}
+          />
+      )}
+
+      {selectedTeamForDetails && (
+          <TeamMatchesModal 
+            team={selectedTeamForDetails} 
+            matches={matches} 
+            teams={teams}
+            stats={selectedTeamStats}
+            onClose={() => setSelectedTeamForDetails(null)} 
           />
       )}
     </Layout>
