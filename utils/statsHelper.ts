@@ -1,3 +1,4 @@
+
 import { Match, Team, TableRow, MatchStatus } from '../types';
 import { ballsFromOvers } from '../services/storageService';
 
@@ -53,17 +54,20 @@ export const calculateTable = (teams: Team[], matches: Match[]): Record<string, 
       const oversLimit = m.totalOvers || 20;
       const nrrA = nrrStats[m.teamAId];
       const nrrB = nrrStats[m.teamBId];
+      
+      const wicketLimit = m.maxWickets || 10;
 
       if (nrrA && nrrB) {
           nrrA.runsScored += m.scoreA.runs;
-          nrrA.ballsFaced += (m.scoreA.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreA.overs));
+          // Use wicketLimit instead of hardcoded 10
+          nrrA.ballsFaced += (m.scoreA.wickets >= wicketLimit ? oversLimit * 6 : ballsFromOvers(m.scoreA.overs));
           nrrA.runsConceded += m.scoreB.runs;
-          nrrA.ballsBowled += (m.scoreB.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
+          nrrA.ballsBowled += (m.scoreB.wickets >= wicketLimit ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
 
           nrrB.runsScored += m.scoreB.runs;
-          nrrB.ballsFaced += (m.scoreB.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
+          nrrB.ballsFaced += (m.scoreB.wickets >= wicketLimit ? oversLimit * 6 : ballsFromOvers(m.scoreB.overs));
           nrrB.runsConceded += m.scoreA.runs;
-          nrrB.ballsBowled += (m.scoreA.wickets === 10 ? oversLimit * 6 : ballsFromOvers(m.scoreA.overs));
+          nrrB.ballsBowled += (m.scoreA.wickets >= wicketLimit ? oversLimit * 6 : ballsFromOvers(m.scoreA.overs));
       }
     }
   });

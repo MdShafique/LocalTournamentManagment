@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Team, MatchStatus, BattingStats, BowlingStats, Player, TeamScorecard, LiveDetails } from '../types';
 import { calculateOvers } from '../services/storageService';
-import { generateAICommentary } from '../services/geminiService';
-import { Mic, Trash2, Trophy, UserCheck, AlertCircle, ArrowRightLeft, Hand, XCircle, RotateCcw, PlusCircle, Award, Star, RefreshCw, PlayCircle } from 'lucide-react';
+import { Trash2, Trophy, ArrowRightLeft, Hand, XCircle, RotateCcw, PlusCircle, RefreshCw, PlayCircle, CloudOff } from 'lucide-react';
 
 interface Props {
   match: Match;
@@ -19,6 +18,9 @@ type WhoOut = 'STRIKER' | 'NON_STRIKER';
 export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpdate, onDelete }) => {
   const [activeInnings, setActiveInnings] = useState<'A' | 'B'>('A');
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Derived state to check if match is in setup phase
+  const isMatchStarting = match.status === MatchStatus.SCHEDULED;
 
   // Scoring State
   const [extraType, setExtraType] = useState<ExtraType>('NONE');
@@ -41,6 +43,16 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
   const [bowlerId, setBowlerId] = useState<string>(match.liveDetails?.bowlerId || '');
 
   const target = match.scoreA.runs + 1;
+  
+  // CRITICAL FIX: Ensure the limit is strictly handled from the match object
+  const maxWkts = match.maxWickets !== undefined ? match.maxWickets : 10;
+  const squadSize = maxWkts === 1 ? 1 : maxWkts + 1;
+
+  // Innings Completion logic check
+  const isCurrentInningsOver = currentScore.isDeclared || 
+                               currentScore.wickets >= maxWkts || 
+                               currentScore.balls >= (match.totalOvers * 6) || 
+                               match.status === MatchStatus.COMPLETED;
 
   useEffect(() => {
       if (match.liveDetails) {
@@ -49,7 +61,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
           setBowlerId(match.liveDetails.bowlerId);
       }
       
-      const innADone = match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared;
+      const innADone = match.scoreA.wickets >= maxWkts || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared;
       
       if (innADone && match.scoreB.balls === 0 && match.scoreB.runs === 0 && match.status !== MatchStatus.COMPLETED) {
           setActiveInnings('B');
@@ -59,7 +71,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
           setActiveInnings('A');
       }
 
-  }, [match.id, match.scoreA.balls, match.scoreB.balls, match.status]); 
+  }, [match.id, match.scoreA.balls, match.scoreA.wickets, match.scoreB.balls, match.status, maxWkts]); 
 
   const getBattingStats = (pid: string, list: BattingStats[], team: Team): BattingStats => {
       let stats = list.find(p => p.playerId === pid);
@@ -171,6 +183,17 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       finally { setIsUpdating(false); }
   };
 
+  const handleAbandonMatch = async () => {
+      if (!window.confirm("ABANDON match due to rain or other emergency?")) return;
+      setIsUpdating(true);
+      try {
+          const updated = JSON.parse(JSON.stringify(match)) as Match;
+          updated.status = MatchStatus.ABANDONED;
+          updated.liveDetails = { strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '', bowlerId: '', bowlerName: '' };
+          await onUpdate(updated);
+      } catch (e) { console.error(e); } finally { setIsUpdating(false); }
+  };
+
   const handleManualEndInnings = async () => {
       const message = activeInnings === 'A' 
           ? `Are you sure you want to END the 1st Innings for ${teamA.name}?` 
@@ -202,7 +225,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
               } else if (updated.scoreA.runs > updated.scoreB.runs) {
                   updated.winnerId = teamA.id;
               } else {
-                  updated.winnerId = undefined; 
+                  updated.winnerId = 'TIED'; 
               }
               updated.liveDetails = {
                 strikerId: '', strikerName: '', nonStrikerId: '', nonStrikerName: '',
@@ -314,7 +337,6 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
              striker.fours += 1;
         }
         
-        // --- 1. HANDLE WICKET FIRST (FIX FOR 6TH BALL) ---
         if (isWicket) {
             const dismissedPlayerId = (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') ? nonStrikerId : strikerId;
             const dismissedPlayerStats = getBattingStats(dismissedPlayerId, targetBattingList, battingTeam);
@@ -360,18 +382,15 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         targetScore.balls += validBallCount;
         targetScore.overs = calculateOvers(targetScore.balls);
 
-        // --- 2. CALCULATE NEXT STRIKER & OVER ROTATION ---
         let nextStriker = strikerId;
         let nextNonStriker = nonStrikerId;
         let nextBowler = bowlerId;
 
-        // Clear player ID if they got out
         if (isWicket) {
             if (wicketType === 'RUN_OUT' && whoOut === 'NON_STRIKER') nextNonStriker = ''; 
             else nextStriker = '';
         }
 
-        // Swap for runs
         if (effectiveRunVal % 2 !== 0) {
             const temp = nextStriker;
             nextStriker = nextNonStriker;
@@ -380,7 +399,6 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
 
         const isOverUp = targetScore.balls > 0 && targetScore.balls % 6 === 0 && validBallCount === 1;
         if (isOverUp) {
-            // End of over strike rotation
             const temp = nextStriker;
             nextStriker = nextNonStriker;
             nextNonStriker = temp;
@@ -390,20 +408,28 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
         }
 
         let autoWinnerId: string | undefined = undefined;
-        let autoStatus = match.status;
+        let isMatchCompleted = false;
 
+        // CRITICAL ENFORCEMENT: Immediately evaluate if innings/match should end based on custom wicket limit
         if (activeInnings === 'B') {
-            if (targetScore.runs >= match.scoreA.runs + 1) {
-                autoStatus = MatchStatus.COMPLETED;
+            if (targetScore.runs >= (match.scoreA.runs + 1)) {
+                isMatchCompleted = true;
                 autoWinnerId = teamB.id;
                 nextStriker = ''; nextNonStriker = ''; nextBowler = '';
-            } else if (targetScore.wickets === 10 || targetScore.balls === match.totalOvers * 6) {
+            } else if (targetScore.wickets >= maxWkts || targetScore.balls === (match.totalOvers * 6)) {
+                isMatchCompleted = true;
                 if (targetScore.runs < match.scoreA.runs) {
-                    autoStatus = MatchStatus.COMPLETED;
                     autoWinnerId = teamA.id;
                 } else if (targetScore.runs === match.scoreA.runs) {
-                    autoStatus = MatchStatus.COMPLETED;
+                    autoWinnerId = 'TIED';
                 }
+                nextStriker = ''; nextNonStriker = ''; nextBowler = '';
+            }
+        } else {
+            // End 1st Innings if all out (maxWkts reached) or overs up
+            if (targetScore.wickets >= maxWkts || targetScore.balls === (match.totalOvers * 6)) {
+                updatedMatch.scoreA.isDeclared = true;
+                nextStriker = ''; nextNonStriker = ''; nextBowler = '';
             }
         }
 
@@ -416,9 +442,8 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
             bowlerName: nextBowler ? targetBowlingList.find(p=>p.playerId===nextBowler)?.playerName || 'Select' : '',
         };
 
-        updatedMatch.status = autoStatus === MatchStatus.COMPLETED ? MatchStatus.COMPLETED : MatchStatus.LIVE;
+        updatedMatch.status = isMatchCompleted ? MatchStatus.COMPLETED : MatchStatus.LIVE;
         if (autoWinnerId) updatedMatch.winnerId = autoWinnerId;
-        else delete updatedMatch.winnerId;
 
         setExtraType('NONE');
         setWicketType('NONE');
@@ -464,8 +489,7 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
       finally { setIsUpdating(false); }
   };
 
-  const isMatchStarting = match.status === MatchStatus.SCHEDULED;
-  const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets === 10 || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared);
+  const isInningsAOver = activeInnings === 'A' && (match.scoreA.wickets >= maxWkts || match.scoreA.balls === match.totalOvers * 6 || match.scoreA.isDeclared);
   const allPlayers = [...(teamA.players || []), ...(teamB.players || [])];
 
   const wicketOptions: {type: WicketType, label: string}[] = [
@@ -487,9 +511,14 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                  {activeInnings === 'A' ? teamA.name : teamB.name} Batting
                  {activeInnings === 'B' && <span className="text-xs bg-slate-100 px-2 py-1 rounded border">Target: {target}</span>}
              </h2>
-             <p className="text-slate-500 text-xs mt-1 uppercase tracking-widest font-black">{match.status}</p>
+             <div className="flex items-center gap-2 mt-1">
+                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Status: {match.status}</p>
+                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                 <p className="text-emerald-600 text-[10px] font-black uppercase tracking-widest">Squad: {squadSize}P ({maxWkts} Wkts Limit)</p>
+             </div>
          </div>
          <div className="flex gap-2">
+            <button onClick={handleAbandonMatch} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-100" title="Abandon Match"><CloudOff size={18}/></button>
             {(isMatchStarting || match.scoreA.balls === 0) && match.status !== MatchStatus.COMPLETED && (
                 <button onClick={handleSwapBattingFirst} disabled={isUpdating} className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded flex items-center gap-2 text-sm font-bold border border-emerald-200" title="Switch Batting Team">
                     <ArrowRightLeft size={18} /> <span className="hidden sm:inline">Switch Batting</span>
@@ -535,10 +564,11 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                   <PlayCircle size={24}/> Start Live Scoring
               </button>
           </div>
-      ) : match.status === MatchStatus.COMPLETED ? (
+      ) : match.status === MatchStatus.COMPLETED || match.status === MatchStatus.ABANDONED ? (
            <div className="text-center py-8">
-               <h3 className="text-2xl font-bold text-slate-800 mb-2">Match Completed</h3>
-               <p className="text-emerald-600 font-bold text-lg mb-4">Winner: {match.winnerId === teamA.id ? teamA.name : (match.winnerId === teamB.id ? teamB.name : "Match Tied")}</p>
+               <Trophy size={48} className="mx-auto mb-4 text-emerald-500" />
+               <h3 className="text-2xl font-bold text-slate-800 mb-2">Match {match.status}</h3>
+               {match.winnerId && <p className="text-emerald-600 font-bold text-lg mb-4">Winner: {match.winnerId === teamA.id ? teamA.name : (match.winnerId === teamB.id ? teamB.name : (match.winnerId === 'TIED' ? "Tied" : "Abandoned"))}</p>}
                
                <div className="max-w-xs mx-auto mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Man of the Match</label>
@@ -558,43 +588,54 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
            </div>
       ) : (
         <>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-emerald-700 mb-1">On Strike</label>
-                        <select className={`w-full border rounded px-2 py-2 text-sm ${!strikerId ? 'border-red-400' : ''}`} value={strikerId} onChange={(e) => handleLiveDetailChange('strikerId', e.target.value)}>
-                            <option value="">Select Striker...</option>
-                            {strikerId && <option value={strikerId}>{battingTeam.players?.find(p=>p.id===strikerId)?.name}</option>}
-                            {getAvailableBatsmen().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Non-Striker</label>
-                        <select className={`w-full border rounded px-2 py-2 text-sm ${!nonStrikerId ? 'border-red-400' : ''}`} value={nonStrikerId} onChange={(e) => handleLiveDetailChange('nonStrikerId', e.target.value)}>
-                            <option value="">Select Non-Striker...</option>
-                            {nonStrikerId && <option value={nonStrikerId}>{battingTeam.players?.find(p=>p.id===nonStrikerId)?.name}</option>}
-                            {getAvailableBatsmen().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-blue-700 mb-1">Bowler</label>
-                        <select className={`w-full border rounded px-2 py-2 text-sm ${!bowlerId ? 'border-red-500' : ''}`} value={bowlerId} onChange={(e) => handleLiveDetailChange('bowlerId', e.target.value)}>
-                            <option value="">Select Bowler...</option>
-                            {bowlingTeam.players?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
+            {/* INNINGS BREAK SECTION */}
             {isInningsAOver && activeInnings === 'A' && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-center mb-6">
-                    <h3 className="font-bold text-yellow-800 mb-2">Innings Break</h3>
-                    <p className="text-sm text-yellow-700 mb-4">{teamA.name} finished at {currentScore.runs}/{currentScore.wickets}. Target: {target}</p>
-                    <button onClick={startInningsB} className="bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-yellow-700">Start 2nd Innings</button>
+                <div className="bg-yellow-50 border-2 border-yellow-200 p-8 rounded-3xl text-center mb-8 animate-fade-in-up">
+                    <h3 className="text-2xl font-black text-yellow-800 mb-2 uppercase">1st Innings Finished</h3>
+                    <p className="text-slate-600 mb-6">{teamA.name} scored {match.scoreA.runs}/{match.scoreA.wickets} in {match.scoreA.overs} overs.</p>
+                    <div className="bg-white p-4 rounded-2xl border-2 border-yellow-100 shadow-sm inline-block mb-6">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target for {teamB.name}</p>
+                        <p className="text-3xl font-black text-yellow-600">{target} Runs</p>
+                    </div>
+                    <div>
+                        <button onClick={startInningsB} className="bg-yellow-600 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-yellow-100 hover:bg-yellow-700 transition-all flex items-center gap-2 mx-auto">
+                            <PlayCircle size={24}/> Start 2nd Innings
+                        </button>
+                    </div>
                 </div>
             )}
 
-            <div className={`transition-opacity ${(!strikerId || !bowlerId || !nonStrikerId || isInningsAOver) ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            {/* SCORING AREA - ONLY VISIBLE IF INNINGS NOT OVER AND NOT SHOWING BREAK SCREEN */}
+            {!isCurrentInningsOver && !isInningsAOver ? (
+              <div className="animate-fade-in">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-emerald-700 mb-1">On Strike</label>
+                            <select className={`w-full border rounded px-2 py-2 text-sm ${!strikerId ? 'border-red-400' : ''}`} value={strikerId} onChange={(e) => handleLiveDetailChange('strikerId', e.target.value)}>
+                                <option value="">Select Striker...</option>
+                                {strikerId && <option value={strikerId}>{battingTeam.players?.find(p=>p.id===strikerId)?.name}</option>}
+                                {getAvailableBatsmen().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1">Non-Striker</label>
+                            <select className={`w-full border rounded px-2 py-2 text-sm ${!nonStrikerId ? 'border-red-400' : ''}`} value={nonStrikerId} onChange={(e) => handleLiveDetailChange('nonStrikerId', e.target.value)}>
+                                <option value="">Select Non-Striker...</option>
+                                {nonStrikerId && <option value={nonStrikerId}>{battingTeam.players?.find(p=>p.id===nonStrikerId)?.name}</option>}
+                                {getAvailableBatsmen().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-blue-700 mb-1">Bowler</label>
+                            <select className={`w-full border rounded px-2 py-2 text-sm ${!bowlerId ? 'border-red-500' : ''}`} value={bowlerId} onChange={(e) => handleLiveDetailChange('bowlerId', e.target.value)}>
+                                <option value="">Select Bowler...</option>
+                                {bowlingTeam.players?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="text-center mb-6 flex flex-col items-center">
                     <div className="text-6xl font-mono font-bold text-slate-800 tracking-tighter">{currentScore.runs}/{currentScore.wickets}</div>
                     <div className="text-slate-500 font-medium">Overs: {currentScore.overs} <span className="text-slate-300">/ {match.totalOvers}</span></div>
@@ -685,7 +726,24 @@ export const AdminMatchControl: React.FC<Props> = ({ match, teamA, teamB, onUpda
                         <button key={run} onClick={() => handleScoreUpdate(run)} className={`py-4 rounded-xl font-bold text-2xl shadow-sm border transition-transform active:scale-95 ${run === 4 ? 'bg-emerald-600 text-white' : run === 6 ? 'bg-emerald-800 text-white' : 'bg-white text-slate-700'}`}>{run}</button>
                     ))}
                 </div>
-            </div>
+              </div>
+            ) : (
+                /* INNINGS OVER SUMMARY VIEW */
+                <div className="text-center py-12 px-6 border-t border-dashed mt-4 animate-fade-in-up">
+                    <div className="text-6xl font-mono font-bold text-slate-300 mb-2">{currentScore.runs}/{currentScore.wickets}</div>
+                    <div className="text-slate-400 font-medium mb-8">Overs: {currentScore.overs} / {match.totalOvers}</div>
+                    
+                    <div className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-100 inline-block relative overflow-hidden group">
+                        <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity"><Trophy size={120}/></div>
+                        <Trophy className="mx-auto text-emerald-500/20 mb-4" size={48} />
+                        <p className="text-slate-400 font-black uppercase tracking-widest text-xs mb-1">Status</p>
+                        <p className="text-slate-900 font-black text-2xl uppercase tracking-tighter">Innings Over</p>
+                        {activeInnings === 'B' && (
+                             <div className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-emerald-100">Match Completed</div>
+                        )}
+                    </div>
+                </div>
+            )}
         </>
       )}
     </div>

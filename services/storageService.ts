@@ -1,3 +1,4 @@
+// Consolidating imports and removing unused QuerySnapshot to resolve module export errors
 import { 
   collection, 
   doc, 
@@ -7,8 +8,7 @@ import {
   deleteDoc, 
   query, 
   where, 
-  onSnapshot,
-  QuerySnapshot 
+  onSnapshot
 } from "firebase/firestore";
 import { db } from './firebase';
 import { Tournament, Team, Match, MatchStatus, Player, StageType } from '../types';
@@ -20,19 +20,16 @@ const MATCHES_COL = 'matches';
 
 // --- HELPERS ---
 
-// Fix: Utility to clean data for Firestore to avoid "undefined" property errors
 const cleanForFirestore = <T>(data: T): T => {
     return JSON.parse(JSON.stringify(data));
 };
 
-// Fix: Helper to format overs from ball count
 export const calculateOvers = (balls: number): number => {
   const full = Math.floor(balls / 6);
   const rem = balls % 6;
   return parseFloat(`${full}.${rem}`);
 };
 
-// Fix: Helper to convert overs to total balls
 export const ballsFromOvers = (overs: number): number => {
     const str = overs.toString();
     const parts = str.split('.');
@@ -41,14 +38,12 @@ export const ballsFromOvers = (overs: number): number => {
     return (overPart * 6) + ballPart;
 }
 
-// Fix: Repair function to ensure incoming match data has all necessary fields
 const repairMatchData = (match: Match): Match => {
     const updated = { ...match };
     if (!updated.scorecard) {
         updated.scorecard = { A: { batting: [], bowling: [] }, B: { batting: [], bowling: [] } };
     }
     
-    // Ensure all bowling stats have maidens property for existing data
     if (updated.scorecard.A.bowling) {
         updated.scorecard.A.bowling = updated.scorecard.A.bowling.map(b => ({ ...b, maidens: b.maidens || 0 }));
     }
@@ -65,16 +60,20 @@ const repairMatchData = (match: Match): Match => {
     if (!updated.history) {
         updated.history = [];
     }
-    // Safeguard maiden tracking fields
     if (updated.currentOverRuns === undefined) updated.currentOverRuns = 0;
     if (updated.currentOverBalls === undefined) updated.currentOverBalls = 0;
+    
+    // CRITICAL: Only set default if field is truly missing. 
+    // This ensures that small matches (like 4P/3 Wkts) don't get reset to 10.
+    if (updated.maxWickets === undefined || updated.maxWickets === null) {
+        updated.maxWickets = 10;
+    }
     
     return updated;
 };
 
 // --- TOURNAMENT METHODS ---
 
-// Fix: Standard Firestore modular retrieval for tournaments using named exports
 export const getTournaments = async (): Promise<Tournament[]> => {
     const snapshot = await getDocs(collection(db, TOURNAMENTS_COL));
     return snapshot.docs.map(d => d.data() as Tournament);
@@ -101,7 +100,6 @@ export const deleteTournament = async (id: string) => {
 
 // --- TEAM METHODS ---
 
-// Fix: Standard Firestore modular retrieval for teams by tournament
 export const getTeams = async (tournamentId: string): Promise<Team[]> => {
     const q = query(collection(db, TEAMS_COL), where("tournamentId", "==", tournamentId));
     const snapshot = await getDocs(q);
@@ -163,21 +161,17 @@ export const deletePlayerFromTeam = async (teamId: string, playerId: string) => 
 
 // --- MATCH METHODS ---
 
-// Fix: Standard Firestore modular retrieval and subscription for matches
 export const getMatches = async (tournamentId: string): Promise<Match[]> => {
     const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => repairMatchData(d.data() as Match));
 };
 
-// Fix: Explicitly type the snapshot as QuerySnapshot to resolve the 'docs' property error in the callback
 export const subscribeToMatches = (tournamentId: string, callback: (matches: Match[]) => void) => {
     const q = query(collection(db, MATCHES_COL), where("tournamentId", "==", tournamentId));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        // Casting snapshot to QuerySnapshot ensures access to the 'docs' property when using onSnapshot with a Query
-        const querySnapshot = snapshot as QuerySnapshot;
-        const matches = querySnapshot.docs.map(d => repairMatchData(d.data() as Match));
+        const matches = snapshot.docs.map(d => repairMatchData(d.data() as Match));
         callback(matches);
     }, (error) => {
         console.error("Error subscribing to matches:", error);
@@ -196,28 +190,30 @@ export const deleteMatch = async (id: string) => {
 
 export const initializeMatch = (
   tId: string, 
-  teamA: string, 
-  teamB: string, 
+  teamAId: string, 
+  teamBId: string, 
   date: string, 
   time: string,
+  venue: string,
   type: string, 
   totalOvers: number,
-  group: string,
+  groupStage: string,
   stageType: StageType = 'group',
-  venue: string = 'Main Ground'
+  maxWickets: number = 10
 ): Match => ({
   id: Date.now().toString(),
   tournamentId: tId,
-  teamAId: teamA,
-  teamBId: teamB,
+  teamAId,
+  teamBId,
   date,
   time,
   venue,
   type,
-  groupStage: group,
+  groupStage,
   stageType,
   status: MatchStatus.SCHEDULED,
   totalOvers,
+  maxWickets, 
   scoreA: { runs: 0, wickets: 0, overs: 0, balls: 0 },
   scoreB: { runs: 0, wickets: 0, overs: 0, balls: 0 },
   scorecard: {

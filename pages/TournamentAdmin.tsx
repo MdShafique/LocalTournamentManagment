@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMatches, getTeams, getTournament, saveTeam, saveMatch, initializeMatch, deleteTeam, deleteMatch, addPlayerToTeam, deletePlayerFromTeam, saveTournament, updatePlayerInTeam } from '../services/storageService';
@@ -6,7 +7,7 @@ import { Layout } from '../components/Layout';
 import { AdminMatchControl } from '../components/AdminMatchControl';
 import { MatchCard } from '../components/MatchCard';
 import { auth, onAuthStateChanged } from '../services/firebase'; 
-import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock, Edit2, Check, UserPlus, Save, Layers, Clock, Image as ImageIcon, MapPin } from 'lucide-react';
+import { Plus, Users, Calendar, ArrowLeft, Share2, X, Trash2, Loader2, Lock, Edit2, Check, UserPlus, Save, Layers, Clock, Medal, Trophy, Image as ImageIcon, MapPin } from 'lucide-react';
 
 export const TournamentAdmin: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,13 +16,13 @@ export const TournamentAdmin: React.FC = () => {
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [view, setView] = useState<'overview' | 'teams' | 'matches'>('overview');
+  const [view, setView] = useState<'overview' | 'teams' | 'matches' | 'awards'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [permissionDenied, setPermissionDenied] = useState(false);
   
   const [newTeamName, setNewTeamName] = useState('');
-  const [newTeamGroup, setNewTeamGroup] = useState('Group A');
   const [newTeamLogo, setNewTeamLogo] = useState('');
+  const [newTeamGroup, setNewTeamGroup] = useState('Group A');
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
 
   const [selectedTeamForSquad, setSelectedTeamForSquad] = useState<Team | null>(null);
@@ -34,59 +35,47 @@ export const TournamentAdmin: React.FC = () => {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
 
   const [showScheduler, setShowScheduler] = useState(false);
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [schedData, setSchedData] = useState({
-      id: '',
       teamA: '', teamB: '',
       date: new Date().toISOString().split('T')[0],
       time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage',
       stageType: 'group' as StageType,
-      venue: ''
+      squadSize: 11,
+      venue: 'Main Ground'
   });
 
   const refreshData = useCallback(async () => {
     if (!id) return;
-    
     try {
         const t = await getTournament(id);
         const currentUser = auth.currentUser;
-
-        if (!t) {
-            setIsLoading(false);
-            return;
-        }
-
-        if (!currentUser || t.adminId !== currentUser.uid) {
-            setPermissionDenied(true);
-            setIsLoading(false);
-            return;
-        }
-
+        if (!t) { setIsLoading(false); return; }
+        if (!currentUser || t.adminId !== currentUser.uid) { setPermissionDenied(true); setIsLoading(false); return; }
         const tm = await getTeams(id);
         const m = await getMatches(id);
-        
         setTournament(t);
         setTeams(tm);
         setMatches(m);
-        
         setSelectedTeamForSquad(prev => prev ? tm.find(team => team.id === prev.id) || null : null);
-    } catch (err) {
-        console.error("Refresh Error:", err);
-    } finally {
-        setIsLoading(false);
-    }
+    } catch (err) { console.error("Refresh Error:", err); } finally { setIsLoading(false); }
   }, [id]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user: any) => {
-      if (user) {
-        refreshData();
-      } else {
-        setIsLoading(false);
-        setPermissionDenied(true);
-      }
+      if (user) refreshData();
+      else { setIsLoading(false); setPermissionDenied(true); }
     });
     return () => unsubscribe();
   }, [refreshData]);
+
+  const allPlayers = useMemo(() => {
+    const list: (Player & { teamName: string })[] = [];
+    teams.forEach(t => {
+      if (t.players) t.players.forEach(p => list.push({ ...p, teamName: t.name }));
+    });
+    return list.sort((a,b) => a.name.localeCompare(b.name));
+  }, [teams]);
 
   const groupedTeams = useMemo(() => {
     const groups: Record<string, Team[]> = {};
@@ -120,6 +109,14 @@ export const TournamentAdmin: React.FC = () => {
       setIsEditingTournament(false);
   };
 
+  const handleSaveAwards = async () => {
+    if (!tournament) return;
+    setIsLoading(true);
+    await saveTournament(tournament);
+    setIsLoading(false);
+    alert("Awards saved successfully!");
+  };
+
   const handleAddTeam = async () => {
     if (!newTeamName.trim() || !id) return;
     const newTeam: Team = {
@@ -132,8 +129,7 @@ export const TournamentAdmin: React.FC = () => {
       players: []
     };
     await saveTeam(newTeam);
-    setNewTeamName('');
-    setNewTeamLogo('');
+    setNewTeamName(''); setNewTeamLogo('');
     await refreshData();
   };
 
@@ -148,8 +144,7 @@ export const TournamentAdmin: React.FC = () => {
   const handleAddPlayer = async () => {
       if (!selectedTeamForSquad || !newPlayerName.trim()) return;
       await addPlayerToTeam(selectedTeamForSquad.id, newPlayerName, newPlayerRole, newPlayerImage);
-      setNewPlayerName('');
-      setNewPlayerImage('');
+      setNewPlayerName(''); setNewPlayerImage('');
       await refreshData();
   };
 
@@ -169,52 +164,52 @@ export const TournamentAdmin: React.FC = () => {
       }
   };
 
-  const handleCreateMatch = async (e: React.FormEvent) => {
+  const handleSaveMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || schedData.teamA === schedData.teamB) return;
 
-    if (schedData.id) {
-        const matchToUpdate = matches.find(m => m.id === schedData.id);
-        if (matchToUpdate) {
-            const updated = {
-                ...matchToUpdate,
+    // Logic for wicket limit: if 1 player, 1 wicket. If more, squadSize - 1.
+    const calculatedMaxWickets = schedData.squadSize > 1 ? schedData.squadSize - 1 : 1;
+
+    if (editingMatchId) {
+        const existingMatch = matches.find(m => m.id === editingMatchId);
+        if (existingMatch) {
+            const updatedMatch: Match = {
+                ...existingMatch,
                 teamAId: schedData.teamA,
                 teamBId: schedData.teamB,
                 date: schedData.date,
                 time: schedData.time,
-                venue: schedData.venue || tournament?.venue || 'Main Ground',
-                totalOvers: schedData.overs,
+                venue: schedData.venue,
                 type: schedData.type,
+                totalOvers: schedData.overs,
                 groupStage: schedData.groupStage,
-                stageType: schedData.stageType
+                stageType: schedData.stageType,
+                maxWickets: calculatedMaxWickets
             };
-            await saveMatch(updated);
+            await saveMatch(updatedMatch);
         }
     } else {
+        // FIX: Added 'venue' as the 6th argument to match storageService signature
         const m = initializeMatch(
           id, 
           schedData.teamA, 
           schedData.teamB, 
           schedData.date, 
           schedData.time, 
+          schedData.venue, // 6th arg (fixed)
           schedData.type, 
           schedData.overs, 
           schedData.groupStage,
           schedData.stageType,
-          schedData.venue || tournament?.venue || 'Main Ground'
+          calculatedMaxWickets
         );
         await saveMatch(m);
     }
-
+    
     await refreshData();
     setShowScheduler(false);
-    setSchedData({
-        id: '', teamA: '', teamB: '',
-        date: new Date().toISOString().split('T')[0],
-        time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage',
-        stageType: 'group',
-        venue: ''
-    });
+    setEditingMatchId(null);
     setView('matches');
   };
 
@@ -227,9 +222,7 @@ export const TournamentAdmin: React.FC = () => {
   const handleDeleteMatch = async (mid: string) => {
       if(window.confirm('Delete match permanently?')) {
         await deleteMatch(mid);
-        if (activeMatch?.id === mid) {
-          setActiveMatch(null);
-        }
+        if (activeMatch?.id === mid) setActiveMatch(null);
         await refreshData();
       }
   };
@@ -248,48 +241,36 @@ export const TournamentAdmin: React.FC = () => {
   return (
     <Layout>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div className="flex-1 w-full">
+        <div>
            <button onClick={() => navigate('/admin')} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm mb-2"><ArrowLeft size={16}/> Back</button>
            <div className="flex items-center gap-3">
-               {tournament.logo && !isEditingTournament && <img src={tournament.logo} className="w-12 h-12 rounded-full object-cover border" alt="logo"/>}
+               {tournament.logo && <img src={tournament.logo} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm" alt="logo"/>}
                {isEditingTournament ? (
-                   <form onSubmit={handleUpdateTournament} className="flex flex-col gap-3 w-full max-w-md bg-slate-50 p-4 rounded-xl border border-slate-200">
-                       <div>
-                           <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Tournament Name</label>
-                           <input autoFocus className="w-full text-lg font-bold text-slate-900 border rounded-lg px-3 py-2 outline-none bg-white mt-1" value={tournament.name} onChange={(e) => setTournament(prev => prev ? {...prev, name: e.target.value} : prev)} />
+                   <form onSubmit={handleUpdateTournament} className="flex flex-col gap-2 bg-white p-4 rounded-xl shadow-lg border">
+                       <div className="flex items-center gap-2">
+                          <input autoFocus className="text-xl font-bold text-slate-900 border-b-2 border-emerald-500 outline-none bg-transparent" placeholder="Tournament Name" value={tournament.name} onChange={(e) => setTournament(prev => prev ? {...prev, name: e.target.value} : prev)} />
+                          <button type="submit" className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-full"><Check size={20}/></button>
+                          <button type="button" onClick={() => { setIsEditingTournament(false); refreshData(); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-full"><X size={20}/></button>
                        </div>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                           <div>
-                               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Logo URL</label>
-                               <input className="w-full text-sm text-slate-600 border rounded-lg px-3 py-2 outline-none bg-white mt-1" value={tournament.logo || ''} placeholder="https://..." onChange={(e) => setTournament(prev => prev ? {...prev, logo: e.target.value} : prev)} />
-                           </div>
-                           <div>
-                               <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Default Venue</label>
-                               <input className="w-full text-sm text-slate-600 border rounded-lg px-3 py-2 outline-none bg-white mt-1" value={tournament.venue || ''} placeholder="e.g. Lords Cricket Ground" onChange={(e) => setTournament(prev => prev ? {...prev, venue: e.target.value} : prev)} />
-                           </div>
-                       </div>
-                       <div className="flex gap-2 pt-2">
-                           <button type="submit" className="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2"><Check size={18}/> Save Changes</button>
-                           <button type="button" onClick={() => { setIsEditingTournament(false); refreshData(); }} className="px-4 py-2 text-slate-500 font-bold border rounded-lg">Cancel</button>
+                       <div className="flex items-center gap-2 mt-2">
+                          <ImageIcon size={16} className="text-slate-400" />
+                          <input className="text-xs w-full border rounded-lg px-3 py-2 outline-none" placeholder="Logo URL (https://...)" value={tournament.logo || ''} onChange={(e) => setTournament(prev => prev ? {...prev, logo: e.target.value} : prev)} />
                        </div>
                    </form>
                ) : (
-                   <div>
-                       <div className="flex items-center gap-2">
-                           <h1 className="text-2xl font-bold text-slate-900">{tournament.name}</h1>
-                           <button onClick={() => setIsEditingTournament(true)} className="p-1.5 text-slate-400 hover:text-slate-600"><Edit2 size={16}/></button>
-                       </div>
-                       {tournament.venue && <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><MapPin size={12}/> {tournament.venue}</p>}
-                   </div>
+                   <>
+                       <h1 className="text-2xl font-bold text-slate-900">{tournament.name}</h1>
+                       <button onClick={() => setIsEditingTournament(true)} className="p-1.5 text-slate-400 hover:text-slate-600"><Edit2 size={16}/></button>
+                   </>
                )}
            </div>
         </div>
-        <button onClick={() => { const url = `${window.location.origin}/#/view/${tournament.id}`; navigator.clipboard.writeText(url); alert('URL copied!'); }} className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg font-bold border border-emerald-100 shrink-0"><Share2 size={18} /> Share Link</button>
+        <button onClick={() => { const url = `${window.location.origin}/#/view/${tournament.id}`; navigator.clipboard.writeText(url); alert('URL copied!'); }} className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg font-bold border border-emerald-100"><Share2 size={18} /> Share Link</button>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-slate-200">
-          {['overview', 'teams', 'matches'].map(tab => (
-              <button key={tab} onClick={() => { setView(tab as any); setActiveMatch(null); setSelectedTeamForSquad(null); }} className={`px-4 py-2 rounded-lg font-medium capitalize transition-colors ${view === tab && !activeMatch && !selectedTeamForSquad ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>{tab}</button>
+          {['overview', 'teams', 'matches', 'awards'].map(tab => (
+              <button key={tab} onClick={() => { setView(tab as any); setActiveMatch(null); setSelectedTeamForSquad(null); }} className={`px-4 py-2 rounded-lg font-medium capitalize ${view === tab && !activeMatch && !selectedTeamForSquad ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}>{tab}</button>
           ))}
       </div>
 
@@ -308,7 +289,7 @@ export const TournamentAdmin: React.FC = () => {
                   <button onClick={() => setSelectedTeamForSquad(null)} className="text-slate-400 p-1 hover:bg-slate-100 rounded-full"><X size={24}/></button>
               </div>
               
-              <div className="flex flex-col md:flex-row gap-3 mb-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex flex-col lg:flex-row gap-4 mb-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
                   <div className="flex-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Player Name</label>
                       <input className="w-full border rounded-lg px-3 py-2 mt-1" placeholder="Enter name" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} />
@@ -321,6 +302,10 @@ export const TournamentAdmin: React.FC = () => {
                           <option value="All-Rounder">All-Rounder</option>
                           <option value="WicketKeeper">Keeper</option>
                       </select>
+                  </div>
+                  <div className="flex-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Player Image URL</label>
+                      <input className="w-full border rounded-lg px-3 py-2 mt-1" placeholder="https://..." value={newPlayerImage} onChange={(e) => setNewPlayerImage(e.target.value)} />
                   </div>
                   <button onClick={handleAddPlayer} className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold h-fit self-end flex items-center gap-2 mb-0.5"><Plus size={18}/> Add</button>
               </div>
@@ -371,17 +356,17 @@ export const TournamentAdmin: React.FC = () => {
                                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Team Name</label>
                                 <input value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="Full Team Name" className="w-full border rounded-xl px-4 py-3 mt-1" />
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Group / Pool</label>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Team Logo URL</label>
+                                <input value={newTeamLogo} onChange={(e) => setNewTeamLogo(e.target.value)} placeholder="https://..." className="w-full border rounded-xl px-4 py-3 mt-1" />
+                            </div>
+                            <div className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Group / Pool Name</label>
                                     <input value={newTeamGroup} onChange={(e) => setNewTeamGroup(e.target.value)} placeholder="e.g. Group A" className="w-full border rounded-xl px-4 py-3 mt-1" />
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Logo URL (Optional)</label>
-                                    <input value={newTeamLogo} onChange={(e) => setNewTeamLogo(e.target.value)} placeholder="https://..." className="w-full border rounded-xl px-4 py-3 mt-1" />
-                                </div>
+                                <button onClick={handleAddTeam} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg h-[50px]">Add</button>
                             </div>
-                            <button onClick={handleAddTeam} className="w-full bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors mt-2">Add Team</button>
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-2xl border shadow-sm">
@@ -399,10 +384,12 @@ export const TournamentAdmin: React.FC = () => {
                                     {groupTeams.map(t => (
                                         <div key={t.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-200 group">
                                             <div className="flex items-center gap-3">
-                                                {t.logo ? <img src={t.logo} className="w-8 h-8 rounded-full border border-white shadow-sm object-cover" alt="logo"/> : <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold uppercase">{t.name[0]}</div>}
-                                                <span className="font-bold text-slate-800">{t.name}</span>
+                                                <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center overflow-hidden shrink-0">
+                                                    {t.logo ? <img src={t.logo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-slate-400 uppercase">{t.name[0]}</span>}
+                                                </div>
+                                                <span className="font-bold text-slate-800 truncate">{t.name}</span>
                                             </div>
-                                            <div className="flex gap-1">
+                                            <div className="flex gap-1 shrink-0">
                                                 <button onClick={() => setSelectedTeamForSquad(t)} className="text-[10px] font-black border bg-white px-3 py-1.5 rounded-lg text-emerald-600 hover:bg-emerald-600 hover:text-white uppercase transition-all">Squad</button>
                                                 <button onClick={() => setEditingTeam(t)} className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors"><Edit2 size={16}/></button>
                                                 <button onClick={() => handleDeleteTeam(t.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
@@ -411,9 +398,6 @@ export const TournamentAdmin: React.FC = () => {
                                     ))}
                                 </div>
                             ))}
-                            {teams.length === 0 && (
-                                <div className="text-center py-10 text-slate-400 italic">No teams registered yet.</div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -421,20 +405,11 @@ export const TournamentAdmin: React.FC = () => {
             {view === 'matches' && (
                 <div className="animate-fade-in-up">
                      <div className="flex justify-end mb-6">
-                        <button 
-                            onClick={() => {
-                                setSchedData({
-                                    id: '',
-                                    teamA: '', teamB: '',
-                                    date: new Date().toISOString().split('T')[0],
-                                    time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage',
-                                    stageType: 'group',
-                                    venue: tournament?.venue || ''
-                                });
-                                setShowScheduler(true);
-                            }} 
-                            className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2"
-                        >
+                        <button onClick={() => { 
+                            setEditingMatchId(null); 
+                            setSchedData({ teamA: '', teamB: '', date: new Date().toISOString().split('T')[0], time: '10:00', overs: 20, type: 'T20', groupStage: 'Group Stage', stageType: 'group', squadSize: 11, venue: 'Main Ground' }); 
+                            setShowScheduler(true); 
+                        }} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2">
                             <Plus size={18}/> Schedule Match
                         </button>
                      </div>
@@ -449,26 +424,110 @@ export const TournamentAdmin: React.FC = () => {
                                 onClick={() => setActiveMatch(m)} 
                                 onDelete={(e, mid) => handleDeleteMatch(mid)}
                                 onEdit={(e, match) => { 
+                                    setEditingMatchId(match.id); 
+                                    const savedMaxWkts = match.maxWickets !== undefined ? match.maxWickets : 10;
+                                    const mappedSquadSize = savedMaxWkts === 1 ? 1 : savedMaxWkts + 1;
                                     setSchedData({ 
-                                        id: match.id,
-                                        teamA: match.teamAId, 
-                                        teamB: match.teamBId, 
-                                        date: match.date, 
-                                        time: match.time, 
-                                        overs: match.totalOvers, 
-                                        type: match.type, 
-                                        groupStage: match.groupStage, 
-                                        stageType: match.stageType || 'group',
-                                        venue: match.venue || tournament?.venue || ''
-                                    });
+                                        teamA: match.teamAId, teamB: match.teamBId, date: match.date, time: match.time, 
+                                        venue: match.venue || 'Main Ground', overs: match.totalOvers, type: match.type, 
+                                        groupStage: match.groupStage, stageType: match.stageType || 'group', squadSize: mappedSquadSize 
+                                    }); 
                                     setShowScheduler(true); 
                                 }}
                             />
                         ))}
-                        {matches.length === 0 && (
-                            <div className="col-span-full py-20 text-center text-slate-400 italic">No matches scheduled yet.</div>
-                        )}
                      </div>
+                </div>
+            )}
+            {view === 'awards' && (
+                <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up">
+                    <div className="bg-white p-8 rounded-3xl border shadow-xl">
+                        <div className="flex items-center gap-3 mb-8">
+                            <Trophy className="text-yellow-500" size={32} />
+                            <h3 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Tournament Awards</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Champion Team</label>
+                                <select 
+                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
+                                    value={tournament.seriesAwards?.championTeamId || ''}
+                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), championTeamId: e.target.value}})}
+                                >
+                                    <option value="">Select Champion...</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Runners Up Team</label>
+                                <select 
+                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
+                                    value={tournament.seriesAwards?.runnersUpTeamId || ''}
+                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), runnersUpTeamId: e.target.value}})}
+                                >
+                                    <option value="">Select Runners Up...</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Man of the Series</label>
+                                <select 
+                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
+                                    value={tournament.seriesAwards?.playerOfSeries || ''}
+                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), playerOfSeries: e.target.value}})}
+                                >
+                                    <option value="">Select Player...</option>
+                                    {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Best Batsman (Top Run Scorer)</label>
+                                <select 
+                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
+                                    value={tournament.seriesAwards?.bestBatsman || ''}
+                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), bestBatsman: e.target.value}})}
+                                >
+                                    <option value="">Select Player...</option>
+                                    {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Best Bowler (Top Wicket Taker)</label>
+                                <select 
+                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-bold"
+                                    value={tournament.seriesAwards?.bestBowler || ''}
+                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), bestBowler: e.target.value}})}
+                                >
+                                    <option value="">Select Player...</option>
+                                    {allPlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>)}
+                                </select>
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Additional Notes / Emergency Info</label>
+                                <textarea 
+                                    className="w-full border rounded-xl px-4 py-3 bg-slate-50 font-medium min-h-[100px]"
+                                    placeholder="Any special mentions or tournament notes..."
+                                    value={tournament.seriesAwards?.emergencyNotes || ''}
+                                    onChange={(e) => setTournament({...tournament, seriesAwards: {...(tournament.seriesAwards || {}), emergencyNotes: e.target.value}})}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t flex justify-end">
+                            <button 
+                                onClick={handleSaveAwards}
+                                className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-100 flex items-center gap-2"
+                            >
+                                <Save size={18} /> Save All Awards
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </>
@@ -485,16 +544,16 @@ export const TournamentAdmin: React.FC = () => {
                           <input className="w-full border rounded-xl px-4 py-3 mt-1" value={editingTeam.name} onChange={e => setEditingTeam({...editingTeam, name: e.target.value})} />
                       </div>
                       <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Team Logo URL</label>
+                          <input className="w-full border rounded-xl px-4 py-3 mt-1" placeholder="https://..." value={editingTeam.logo || ''} onChange={e => setEditingTeam({...editingTeam, logo: e.target.value})} />
+                      </div>
+                      <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Group / Pool</label>
                           <input className="w-full border rounded-xl px-4 py-3 mt-1" value={editingTeam.group} onChange={e => setEditingTeam({...editingTeam, group: e.target.value})} />
                       </div>
-                      <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Logo URL</label>
-                          <input className="w-full border rounded-xl px-4 py-3 mt-1" value={editingTeam.logo || ''} placeholder="https://..." onChange={e => setEditingTeam({...editingTeam, logo: e.target.value})} />
-                      </div>
                       <div className="flex gap-2 pt-4">
                           <button type="button" onClick={() => setEditingTeam(null)} className="flex-1 py-3 font-bold text-slate-400">Cancel</button>
-                          <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-emerald-100">Update Team</button>
+                          <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-emerald-100">Update</button>
                       </div>
                   </form>
               </div>
@@ -504,7 +563,7 @@ export const TournamentAdmin: React.FC = () => {
       {/* Edit Player Modal */}
       {editingPlayer && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-              <div className="bg-white rounded-3xl p-8 w-full max-sm shadow-2xl animate-fade-in-up">
+              <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
                   <h3 className="text-xl font-black mb-6 flex items-center gap-2"><Edit2 size={20} className="text-emerald-600"/> Edit Player</h3>
                   <form onSubmit={handleUpdatePlayer} className="space-y-4">
                       <div>
@@ -520,7 +579,7 @@ export const TournamentAdmin: React.FC = () => {
                       </div>
                       <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Image URL (Optional)</label>
-                          <input className="w-full border rounded-xl px-4 py-3 mt-1" value={editingPlayer.image || ''} onChange={e => setEditingPlayer({...editingPlayer, image: e.target.value})} />
+                          <input className="w-full border rounded-xl px-4 py-3 mt-1" placeholder="https://..." value={editingPlayer.image || ''} onChange={e => setEditingPlayer({...editingPlayer, image: e.target.value})} />
                       </div>
                       <div className="flex gap-2 pt-4">
                           <button type="button" onClick={() => setEditingPlayer(null)} className="flex-1 py-3 font-bold text-slate-400">Cancel</button>
@@ -535,20 +594,20 @@ export const TournamentAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4">
               <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-fade-in-up">
                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-black text-slate-900 uppercase">{schedData.id ? 'Edit Match' : 'Match Settings'}</h3>
-                      <button onClick={() => setShowScheduler(false)} className="p-2 text-slate-400"><X size={24}/></button>
+                      <h3 className="text-2xl font-black text-slate-900 uppercase">{editingMatchId ? 'Edit Match' : 'Match Settings'}</h3>
+                      <button onClick={() => { setShowScheduler(false); setEditingMatchId(null); }} className="p-2 text-slate-400"><X size={24}/></button>
                   </div>
-                  <form onSubmit={handleCreateMatch} className="space-y-5">
+                  <form onSubmit={handleSaveMatch} className="space-y-5">
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Match Stage / Group</label>
-                              <input placeholder="e.g. Group A or Final" value={schedData.groupStage} onChange={(e) => setSchedData({...schedData, groupStage: e.target.value})} className="w-full border rounded-xl px-4 py-3" required />
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Match Stage</label>
+                              <input placeholder="e.g. Group A" value={schedData.groupStage} onChange={(e) => setSchedData({...schedData, groupStage: e.target.value})} className="w-full border rounded-xl px-4 py-3" required />
                           </div>
                           <div>
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Stage Type</label>
                               <select value={schedData.stageType} onChange={(e) => setSchedData({...schedData, stageType: e.target.value as StageType})} className="w-full border rounded-xl px-4 py-3 bg-white">
-                                  <option value="group">Group Stage (Points Table)</option>
-                                  <option value="knockout">Knockout (No Points)</option>
+                                  <option value="group">Group Stage</option>
+                                  <option value="knockout">Knockout</option>
                               </select>
                           </div>
                       </div>
@@ -563,11 +622,25 @@ export const TournamentAdmin: React.FC = () => {
                               <select required value={schedData.teamB} onChange={(e) => setSchedData({...schedData, teamB: e.target.value})} className="w-full border rounded-xl px-4 py-3 bg-white"><option value="">Select Team</option>{teams.map(t => <option key={t.id} value={t.id} disabled={t.id === schedData.teamA}>{t.name}</option>)}</select>
                           </div>
                       </div>
+
+                      <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Venue / Ground Name</label>
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                            <input placeholder="e.g. Lords Cricket Ground" value={schedData.venue} onChange={(e) => setSchedData({...schedData, venue: e.target.value})} className="w-full border rounded-xl pl-10 pr-4 py-3" required />
+                          </div>
+                      </div>
                       
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           <div className="col-span-1">
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Overs</label>
                               <input type="number" value={schedData.overs} onChange={(e) => setSchedData({...schedData, overs: parseInt(e.target.value)})} className="w-full border rounded-xl px-4 py-3" />
+                          </div>
+                          <div className="col-span-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Squad Size</label>
+                              <select value={schedData.squadSize} onChange={(e) => setSchedData({...schedData, squadSize: parseInt(e.target.value)})} className="w-full border rounded-xl px-4 py-3 bg-white">
+                                  {[1,2,3,4,5,6,7,8,9,10,11].map(num => <option key={num} value={num}>{num} P</option>)}
+                              </select>
                           </div>
                           <div className="col-span-1">
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Format</label>
@@ -579,19 +652,13 @@ export const TournamentAdmin: React.FC = () => {
                           </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Match Date</label>
-                              <input type="date" value={schedData.date} onChange={(e) => setSchedData({...schedData, date: e.target.value})} className="w-full border rounded-xl px-4 py-3"/>
-                          </div>
-                          <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Venue</label>
-                              <input placeholder="Enter Venue" value={schedData.venue} onChange={(e) => setSchedData({...schedData, venue: e.target.value})} className="w-full border rounded-xl px-4 py-3" />
-                          </div>
+                      <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Match Date</label>
+                          <input type="date" value={schedData.date} onChange={(e) => setSchedData({...schedData, date: e.target.value})} className="w-full border rounded-xl px-4 py-3"/>
                       </div>
 
                       <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 mt-4">
-                        {schedData.id ? 'Update Match Details' : 'Confirm Schedule'}
+                          {editingMatchId ? 'Update Match' : 'Confirm Schedule'}
                       </button>
                   </form>
               </div>
