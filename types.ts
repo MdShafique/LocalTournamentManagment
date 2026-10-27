@@ -107,6 +107,61 @@ export interface Match {
   // Tracking for maiden overs calculation
   currentOverRuns?: number;
   currentOverBalls?: number;
+  maxWickets?: number;
+}
+
+export type PaymentMethod = 'bkash' | 'nagad' | 'rocket' | 'cash';
+
+export interface CommitteeMember {
+  id: string;
+  name: string;
+  title: string;       // e.g. President, Secretary, Member, Umpire
+  description?: string; // Optional subtitle / bio / designation details
+  phone?: string;
+  imageUrl?: string;
+}
+
+export interface CommitteeGroup {
+  id: string;
+  name: string;        // e.g. "Tournament Organizing Committee", "Stadium Committee"
+  members: CommitteeMember[];
+}
+
+export interface CommitteeConfig {
+  tagline?: string;          // e.g. "Badarkhali Premier League Night Short-Pitch Cricket Tournament"
+  presentedByLabel?: string; // e.g. "Presented By"
+  presentedBy?: string;      // e.g. "ANM Hefaz Shikder" (shown as large heading)
+  groups: CommitteeGroup[];
+}
+
+export interface SponsoredAdItem {
+  id: string;
+  badgeText?: string; // Custom badge/button text, e.g. "SPONSOR", "INFO", "NOTICE", "ঘোষণা"
+  text: string;
+  sponsorName?: string;
+  logo?: string;
+  link?: string;
+}
+
+export interface SponsoredAdsConfig {
+  enabled?: boolean;
+  defaultBadgeText?: string;
+  speedSeconds?: number; // duration in seconds for one run across the screen (e.g. 15s)
+  repeatCount?: number;  // 0 or undefined = infinite/unlimited, or specific count
+  items: SponsoredAdItem[];
+}
+
+export interface PaymentGatewayConfig {
+  bkashNumber?: string;
+  bkashType?: 'Personal' | 'Merchant' | 'Agent';
+  nagadNumber?: string;
+  nagadType?: 'Personal' | 'Merchant';
+  rocketNumber?: string;
+  rocketType?: 'Personal' | 'Merchant';
+  cashCollectorName?: string;
+  cashCollectorPhone?: string;
+  instructions?: string;
+  enabledMethods?: PaymentMethod[];
 }
 
 export interface Tournament {
@@ -117,13 +172,50 @@ export interface Tournament {
   adminId: string;
   logo?: string;
   venue?: string;
+  registrationFee?: number;
+  isRegistrationOpen?: boolean;
+  registrationStartDate?: string;
+  registrationEndDate?: string;
+  rules?: string;
+  paymentInfo?: PaymentGatewayConfig;
+  isCommitteeVisible?: boolean;
+  committee?: CommitteeConfig;
+  sponsoredAds?: SponsoredAdsConfig;
   seriesAwards?: {
       playerOfSeries?: string;
       bestBatsman?: string;
       bestBowler?: string;
       championTeamId?: string;
+      runnersUpTeamId?: string;
       emergencyNotes?: string;
   };
+}
+
+export type RegistrationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PlayerRegistration {
+  id: string;
+  tournamentId: string;
+  name: string;
+  fatherName: string;
+  motherName: string;
+  whatsappNumber: string;
+  role: 'Batsman' | 'Bowler' | 'All-Rounder' | 'WicketKeeper';
+  bloodGroup: string;
+  address: string;
+  jerseyNumber?: string;
+  jerseySize?: 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL' | string;
+  imageUrl?: string;
+  registrationFee: number;
+  paymentMethod: PaymentMethod;
+  senderNumber: string;
+  transactionId: string;
+  status: RegistrationStatus;
+  assignedTeamId?: string;
+  assignedTeamName?: string;
+  createdAt: string;
+  reviewedAt?: string;
+  notes?: string;
 }
 
 export interface TableRow {

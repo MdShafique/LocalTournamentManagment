@@ -1,9 +1,12 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Trophy, Home, User, ExternalLink } from 'lucide-react';
 
-export const Layout: React.FC<{ children: React.ReactNode; title?: string }> = ({ children, title }) => {
+export const Layout: React.FC<{ 
+  children: React.ReactNode; 
+  title?: string;
+  rightAction?: React.ReactNode;
+}> = ({ children, title, rightAction }) => {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   const isViewer = location.pathname.startsWith('/view/');
@@ -24,13 +27,15 @@ export const Layout: React.FC<{ children: React.ReactNode; title?: string }> = (
 
             {/* Center: Tournament Title (for Viewer) - Responsive Positioning */}
             {title && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-12 sm:px-0">
-                    <span className="font-bold text-base sm:text-lg text-emerald-100 truncate max-w-full">{title}</span>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-20 sm:px-32">
+                    <span className="font-bold text-sm sm:text-lg text-emerald-100 truncate max-w-full">{title}</span>
                 </div>
             )}
             
             {/* Right: Actions */}
             <div className="flex items-center gap-2 sm:gap-4 z-10 shrink-0">
+               {rightAction}
+
                {/* Only show Admin Login if NOT on a viewer page and NOT already an admin page */}
                {!isAdmin && !isViewer && (
                    <Link to="/admin" className="text-emerald-100 hover:text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1">

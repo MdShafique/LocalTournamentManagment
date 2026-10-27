@@ -11,12 +11,13 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { db } from './firebase';
-import { Tournament, Team, Match, MatchStatus, Player, StageType } from '../types';
+import { Tournament, Team, Match, MatchStatus, Player, StageType, PlayerRegistration, RegistrationStatus } from '../types';
 
 // Collections
 const TOURNAMENTS_COL = 'tournaments';
 const TEAMS_COL = 'teams';
 const MATCHES_COL = 'matches';
+const REGISTRATIONS_COL = 'registrations';
 
 // --- HELPERS ---
 
@@ -88,6 +89,20 @@ export const getTournamentsByAdmin = async (adminId: string): Promise<Tournament
 export const getTournament = async (id: string): Promise<Tournament | undefined> => {
     const snap = await getDoc(doc(db, TOURNAMENTS_COL, id));
     return snap.exists() ? (snap.data() as Tournament) : undefined;
+};
+
+export const subscribeToTournament = (id: string, callback: (tournament: Tournament | undefined) => void) => {
+    const unsubscribe = onSnapshot(doc(db, TOURNAMENTS_COL, id), (snap) => {
+        if (snap.exists()) {
+            callback(snap.data() as Tournament);
+        } else {
+            callback(undefined);
+        }
+    }, (error) => {
+        console.error("Error subscribing to tournament:", error);
+    });
+
+    return unsubscribe;
 };
 
 export const saveTournament = async (tournament: Tournament) => {
@@ -229,3 +244,87 @@ export const initializeMatch = (
   currentOverRuns: 0,
   currentOverBalls: 0
 });
+
+// --- REGISTRATION METHODS ---
+
+export const getRegistrations = async (tournamentId: string): Promise<PlayerRegistration[]> => {
+    const q = query(collection(db, REGISTRATIONS_COL), where("tournamentId", "==", tournamentId));
+    const snapshot = await getDocs(q);
+    const list = snapshot.docs.map(d => d.data() as PlayerRegistration);
+    list.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+    return list;
+};
+
+export const subscribeToRegistrations = (tournamentId: string, callback: (regs: PlayerRegistration[]) => void) => {
+    const q = query(collection(db, REGISTRATIONS_COL), where("tournamentId", "==", tournamentId));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const regs = snapshot.docs.map(d => d.data() as PlayerRegistration);
+        regs.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+        callback(regs);
+    }, (error) => {
+        console.error("Error subscribing to registrations:", error);
+    });
+
+    return unsubscribe;
+};
+
+export const savePlayerRegistration = async (registration: PlayerRegistration) => {
+    await setDoc(doc(db, REGISTRATIONS_COL, registration.id), cleanForFirestore(registration));
+};
+
+export const updateRegistrationStatus = async (
+    id: string, 
+    status: RegistrationStatus, 
+    assignedTeamId?: string, 
+    assignedTeamName?: string
+) => {
+    const ref = doc(db, REGISTRATIONS_COL, id);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+        const data = snap.data() as PlayerRegistration;
+        const updated: PlayerRegistration = {
+            ...data,
+            status,
+            reviewedAt: new Date().toISOString(),
+            ...(assignedTeamId !== undefined ? { assignedTeamId } : {}),
+            ...(assignedTeamName !== undefined ? { assignedTeamName } : {})
+        };
+        await setDoc(ref, cleanForFirestore(updated));
+    }
+};
+
+export const deleteRegistration = async (id: string) => {
+    await deleteDoc(doc(db, REGISTRATIONS_COL, id));
+};
+
+export const assignPlayerToTeam = async (
+    tournamentId: string,
+    registration: PlayerRegistration,
+    teamId: string,
+    teamName: string
+) => {
+    // 1. Add player to the team's squad if not already present
+    const teamRef = doc(db, TEAMS_COL, teamId);
+    const teamSnap = await getDoc(teamRef);
+    if (teamSnap.exists()) {
+        const team = teamSnap.data() as Team;
+        const existingPlayer = team.players?.find(p => p.name.toLowerCase() === registration.name.toLowerCase());
+        
+        if (!existingPlayer) {
+            const newPlayer: Player = {
+                id: Date.now().toString() + Math.random().toString().slice(2, 5),
+                name: registration.name,
+                role: registration.role,
+                totalRuns: 0,
+                totalWickets: 0,
+                image: registration.imageUrl || ''
+            };
+            const updatedPlayers = team.players ? [...team.players, newPlayer] : [newPlayer];
+            await setDoc(teamRef, cleanForFirestore({ ...team, players: updatedPlayers }));
+        }
+    }
+
+    // 2. Update registration status to approved and assign team
+    await updateRegistrationStatus(registration.id, 'approved', teamId, teamName);
+};

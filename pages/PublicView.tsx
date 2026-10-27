@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { getTeams, getTournament, subscribeToMatches } from '../services/storageService';
+import { getTeams, getTournament, subscribeToMatches, subscribeToTournament } from '../services/storageService';
 import { calculateTable } from '../utils/statsHelper';
 import { Match, Team, Tournament, TableRow, MatchStatus, Player } from '../types';
 import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
 import { PlayerDetailModal } from '../components/PlayerDetailModal';
-import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap, X, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
+import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap, X, CheckCircle2, XCircle, MinusCircle, UserPlus, Clock, Timer, Users, Building2 } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { PlayerRegistrationModal } from '../components/PlayerRegistrationModal';
+import { CommitteeModal } from '../components/CommitteeModal';
+import { SponsoredAdTicker } from '../components/SponsoredAdTicker';
 
 interface TopBatsman {
   id: string;
@@ -151,28 +154,35 @@ export const PublicView: React.FC = () => {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [selectedPlayerInfo, setSelectedPlayerInfo] = useState<{ player: Player, team: Team } | null>(null);
   const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showCommitteeModal, setShowCommitteeModal] = useState(false);
+
+  // Real-time Tournament subscription (sponsored ads, committee, registration status, timer etc.)
+  useEffect(() => {
+    if (!id) return;
+    const unsubscribe = subscribeToTournament(id, (t) => {
+      if (!t) {
+        setError("Tournament not found.");
+        setLoading(false);
+        return;
+      }
+      setTournament(t);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [id]);
 
   useEffect(() => {
-    const loadStaticData = async () => {
+    const loadTeamsData = async () => {
         if (!id) return;
         try {
-            const t = await getTournament(id);
-            if (!t) {
-                setError("Tournament not found.");
-                setLoading(false);
-                return;
-            }
             const tm = await getTeams(id);
-            setTournament(t);
             setTeams(tm || []);
-            if (tm) setLoading(false);
         } catch (e) {
             console.error(e);
-            setError("Failed to load data.");
-            setLoading(false);
         }
     };
-    loadStaticData();
+    loadTeamsData();
   }, [id]);
 
   useEffect(() => {
@@ -207,7 +217,7 @@ export const PublicView: React.FC = () => {
 
   const selectedTeamStats = useMemo(() => {
       if (!selectedTeamForDetails) return undefined;
-      for (const groupRows of Object.values(groupedTables)) {
+      for (const groupRows of Object.values(groupedTables) as TableRow[][]) {
           const row = groupRows.find(r => r.teamId === selectedTeamForDetails.id);
           if (row) return row;
       }
@@ -330,37 +340,169 @@ export const PublicView: React.FC = () => {
     );
   };
 
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Timer calculation
+  const regTimer = useMemo(() => {
+    if (!tournament?.registrationEndDate && !tournament?.registrationStartDate) return null;
+
+    const startMs = tournament.registrationStartDate ? new Date(tournament.registrationStartDate).getTime() : 0;
+    const endMs = tournament.registrationEndDate ? new Date(tournament.registrationEndDate).getTime() : 0;
+
+    if (startMs && currentTime < startMs) {
+      const diff = Math.max(0, startMs - currentTime);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      return { status: 'upcoming', label: 'রেজিস্ট্রেশন শুরু হতে বাকি', days, hours, minutes, seconds };
+    }
+
+    if (endMs) {
+      if (currentTime > endMs) {
+        return { status: 'ended', label: 'রেজিস্ট্রেশনের সময় শেষ হয়েছে', days: 0, hours: 0, minutes: 0, seconds: 0 };
+      }
+      const diff = Math.max(0, endMs - currentTime);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      return { status: 'active', label: 'রেজিস্ট্রেশন শেষ হতে বাকি', days, hours, minutes, seconds };
+    }
+
+    return null;
+  }, [tournament, currentTime]);
+
   if (error) return <Layout><div className="flex flex-col items-center justify-center pt-20 text-slate-500"><AlertCircle size={48} className="text-red-400 mb-4"/><h2>Oops! {error}</h2></div></Layout>;
   if (loading || !tournament) return <Layout><div className="flex flex-col items-center justify-center mt-20 gap-3"><Loader2 className="animate-spin text-emerald-600" size={40}/><p className="text-slate-500 uppercase text-[10px] font-black tracking-widest">CricManage Engine...</p></div></Layout>;
 
+  const isRegOpen = tournament.isRegistrationOpen !== false && regTimer?.status !== 'ended' && regTimer?.status !== 'upcoming';
+
   return (
-    <Layout title={tournament.name}>
-      {/* Pill Style Navigation */}
-      <div className="flex overflow-x-auto gap-2 p-1 mb-6 sticky top-16 bg-slate-50/90 backdrop-blur-md z-40 no-scrollbar items-center">
-          {[
-              { id: 'matches', label: 'Matches', icon: Activity },
-              { id: 'table', label: 'Standings', icon: Layers },
-              { id: 'squads', label: 'Squads', icon: Trophy },
-              { id: 'stats', label: 'Leaderboard', icon: BarChart3 },
-              { id: 'awards', label: 'Awards', icon: Award }
-          ].map(tab => (
-            <button 
-                key={tab.id} 
-                onClick={() => setActiveTab(tab.id as any)} 
-                className={`px-5 py-2.5 rounded-full font-bold text-[10px] sm:text-xs uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 border shadow-sm ${
-                    activeTab === tab.id 
-                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-200 shadow-lg' 
-                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                }`}
+    <Layout 
+      title={tournament.name}
+      rightAction={
+        <div className="flex items-center gap-2">
+          {tournament.isCommitteeVisible && (
+            <button
+              onClick={() => setShowCommitteeModal(true)}
+              className="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 hover:text-white font-extrabold px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow transition-all active:scale-95 border border-emerald-600 shrink-0"
+              title="About Committee"
             >
-                <tab.icon size={14} /> {tab.label}
+              <Users size={16} className="shrink-0 text-emerald-300" />
+              <span>About Committee</span>
             </button>
-          ))}
+          )}
+
+          {tournament.isRegistrationOpen !== false && regTimer?.status !== 'ended' ? (
+            <button
+              onClick={() => {
+                if (regTimer?.status === 'upcoming') {
+                  alert('রেজিস্ট্রেশন এখনো শুরু হয়নি!');
+                  return;
+                }
+                setShowRegistrationModal(true);
+              }}
+              className={`${
+                regTimer?.status === 'upcoming' 
+                  ? 'bg-slate-200 text-slate-600 hover:bg-slate-300 border-slate-300' 
+                  : 'bg-yellow-400 hover:bg-yellow-300 text-slate-900 border-yellow-300'
+              } font-extrabold px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow transition-all active:scale-95 border shrink-0`}
+              title="Register as a Player"
+            >
+              <UserPlus size={16} className="shrink-0" />
+              <span>{regTimer?.status === 'upcoming' ? 'Registration Upcoming' : 'Registration'}</span>
+            </button>
+          ) : undefined}
+        </div>
+      }
+    >
+      {/* Registration Countdown Banner */}
+      {regTimer && tournament.isRegistrationOpen !== false && (
+        <div className={`mb-6 p-4 rounded-2xl border shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${
+          regTimer.status === 'active' 
+            ? 'bg-gradient-to-r from-emerald-900 to-slate-900 border-emerald-700 text-white' 
+            : regTimer.status === 'upcoming'
+            ? 'bg-gradient-to-r from-blue-900 to-slate-900 border-blue-700 text-white'
+            : 'bg-slate-100 border-slate-200 text-slate-600'
+        }`}>
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className={`p-2.5 rounded-xl shrink-0 ${
+              regTimer.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' : regTimer.status === 'upcoming' ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-200 text-slate-500'
+            }`}>
+              <Timer size={22} className={regTimer.status === 'active' ? 'animate-pulse' : ''} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-300">Player Registration Timer</p>
+              <h4 className="font-extrabold text-sm sm:text-base">{regTimer.label}</h4>
+            </div>
+          </div>
+
+          {regTimer.status !== 'ended' ? (
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm border border-white/10 px-3 py-1.5 rounded-xl min-w-[50px]">
+                <span className="text-lg font-black font-mono text-yellow-300">{String(regTimer.days).padStart(2, '0')}</span>
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">Days</span>
+              </div>
+              <span className="font-bold text-yellow-400">:</span>
+              <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm border border-white/10 px-3 py-1.5 rounded-xl min-w-[50px]">
+                <span className="text-lg font-black font-mono text-yellow-300">{String(regTimer.hours).padStart(2, '0')}</span>
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">Hours</span>
+              </div>
+              <span className="font-bold text-yellow-400">:</span>
+              <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm border border-white/10 px-3 py-1.5 rounded-xl min-w-[50px]">
+                <span className="text-lg font-black font-mono text-yellow-300">{String(regTimer.minutes).padStart(2, '0')}</span>
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">Mins</span>
+              </div>
+              <span className="font-bold text-yellow-400">:</span>
+              <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm border border-white/10 px-3 py-1.5 rounded-xl min-w-[50px]">
+                <span className="text-lg font-black font-mono text-emerald-400">{String(regTimer.seconds).padStart(2, '0')}</span>
+                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">Secs</span>
+              </div>
+            </div>
+          ) : (
+            <div className="px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-600 font-bold text-xs rounded-xl">
+              Registration Closed
+            </div>
+          )}
+        </div>
+      )}
+      {/* Pill Style Navigation */}
+      <div className="flex overflow-x-auto gap-2 p-1 mb-6 sticky top-16 bg-slate-50/90 backdrop-blur-md z-40 no-scrollbar items-center justify-between">
+          <div className="flex items-center gap-2">
+            {[
+                { id: 'matches', label: 'Matches', icon: Activity },
+                { id: 'table', label: 'Standings', icon: Layers },
+                { id: 'squads', label: 'Squads', icon: Trophy },
+                { id: 'stats', label: 'Leaderboard', icon: BarChart3 },
+                { id: 'awards', label: 'Awards', icon: Award }
+            ].map(tab => (
+              <button 
+                  key={tab.id} 
+                  onClick={() => setActiveTab(tab.id as any)} 
+                  className={`px-5 py-2.5 rounded-full font-bold text-[10px] sm:text-xs uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 border shadow-sm ${
+                      activeTab === tab.id 
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-200 shadow-lg' 
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+              >
+                  <tab.icon size={14} /> {tab.label}
+              </button>
+            ))}
+          </div>
       </div>
 
       <div className="max-w-full overflow-x-hidden">
           {activeTab === 'matches' && (
               <div className="space-y-8 sm:space-y-12 animate-fade-in-up px-1">
+                  {/* Sponsored Ad Marquee Ticker */}
+                  <SponsoredAdTicker config={tournament.sponsoredAds} />
+
                   {sortedMatches.live.length > 0 && (
                       <div className="mb-8">
                           <h2 className="flex items-center gap-2 text-[10px] font-black text-red-600 mb-4 tracking-[0.3em] uppercase ml-1">
@@ -683,6 +825,22 @@ export const PublicView: React.FC = () => {
             teams={teams}
             stats={selectedTeamStats}
             onClose={() => setSelectedTeamForDetails(null)} 
+          />
+      )}
+
+      {tournament && (
+          <PlayerRegistrationModal 
+            tournament={tournament}
+            isOpen={showRegistrationModal}
+            onClose={() => setShowRegistrationModal(false)}
+          />
+      )}
+
+      {tournament && (
+          <CommitteeModal 
+            tournament={tournament}
+            isOpen={showCommitteeModal}
+            onClose={() => setShowCommitteeModal(false)}
           />
       )}
     </Layout>
