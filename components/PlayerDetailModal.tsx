@@ -123,7 +123,7 @@ export const PlayerDetailModal: React.FC<Props> = ({ player, team, matches = [],
 
         {/* Footer */}
         <div className="p-4 sm:p-6 bg-white border-t border-slate-100 text-center shrink-0">
-           <p className="text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.2em] sm:tracking-[0.3em]">Advanced Player Metrics powered by CricManage Pro</p>
+           <p className="text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.2em] sm:tracking-[0.3em]">Advanced Player Metrics </p>
         </div>
       </div>
     </div>

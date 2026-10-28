@@ -25,64 +25,61 @@ export const CommitteeModal: React.FC<CommitteeModalProps> = ({
   const totalMembers = groups.reduce((acc, g) => acc + (g.members?.length || 0), 0);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-3 sm:p-6 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl border border-white/20 overflow-hidden my-auto max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-2.5 sm:p-6 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-2xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl border border-white/20 overflow-hidden my-auto max-h-[92vh] flex flex-col">
         
-        {/* Header */}
-        <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 p-6 sm:p-8 text-white relative shrink-0">
-          <div className="flex items-start justify-between gap-4 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 border-2 border-white/20 backdrop-blur-md flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
-                {tournament.logo ? (
-                  <img src={tournament.logo} alt={tournament.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Building2 size={30} className="text-emerald-400" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] sm:text-xs font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
-                    <ShieldCheck size={12} /> Management Committee
-                  </span>
-                  <span className="text-white/60 text-[10px] sm:text-xs font-bold">
-                    {totalMembers} Total Members
-                  </span>
-                </div>
-                <h3 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-white leading-tight">
-                  About Committee
-                </h3>
-              </div>
+        {/* Slim Top Header with Close Button */}
+        <div className="bg-slate-900 px-4 sm:px-6 py-3 sm:py-4 text-white flex items-center justify-between shrink-0 border-b border-white/10 z-10">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center overflow-hidden shrink-0">
+              {tournament.logo ? (
+                <img src={tournament.logo} alt={tournament.name} className="w-full h-full object-cover" />
+              ) : (
+                <Building2 size={20} className="text-emerald-400" />
+              )}
             </div>
-
-            <button 
-              onClick={onClose}
-              className="p-2 sm:p-2.5 bg-white/10 hover:bg-white/20 rounded-2xl text-white/80 hover:text-white transition-colors shrink-0"
-              title="Close"
-            >
-              <X size={20} />
-            </button>
+            <div>
+              <h3 className="text-sm sm:text-base font-black uppercase tracking-tight text-white flex items-center gap-2">
+                <span>About Committee</span>
+                <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                  {totalMembers}
+                </span>
+              </h3>
+            </div>
           </div>
 
+          <button 
+            onClick={onClose}
+            className="p-1.5 sm:p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white/80 hover:text-white transition-colors shrink-0"
+            title="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Scrollable Content Body (Hero Showcase scrolls together so committee list has full space on mobile) */}
+        <div className="p-3 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50 space-y-4 sm:space-y-6">
+          
           {/* Tournament & Presented By Hero Showcase */}
-          <div className="mt-5 p-4 sm:p-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm text-center space-y-2">
-            <h2 className="text-sm sm:text-lg font-black uppercase tracking-wider text-emerald-200">
+          <div className="p-4 sm:p-6 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-800/40 rounded-2xl sm:rounded-3xl text-center space-y-2 text-white shadow-md">
+            <h2 className="text-xs sm:text-sm md:text-base font-black uppercase tracking-wider text-emerald-300">
               {tournament.committee?.tagline || tournament.name}
             </h2>
 
             {tournament.committee?.presentedBy && (
               <div className="py-1">
-                <p className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.25em] text-yellow-300">
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-yellow-300">
                   {tournament.committee.presentedByLabel || 'Presented By'}
                 </p>
-                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white mt-1 drop-shadow-md">
+                <h1 className="text-xl sm:text-3xl md:text-4xl font-black uppercase tracking-tight text-white mt-0.5 drop-shadow-sm">
                   {tournament.committee.presentedBy}
                 </h1>
               </div>
             )}
 
             {tournament.venue && (
-              <p className="text-xs sm:text-sm text-emerald-200/80 flex items-center justify-center gap-1.5 pt-1">
-                <MapPin size={14} className="text-emerald-400" />
+              <p className="text-[11px] sm:text-xs text-emerald-200/80 flex items-center justify-center gap-1 pt-0.5">
+                <MapPin size={12} className="text-emerald-400 shrink-0" />
                 <span>{tournament.venue}</span>
               </p>
             )}
@@ -90,13 +87,13 @@ export const CommitteeModal: React.FC<CommitteeModalProps> = ({
 
           {/* Group Filter Pills if multiple groups */}
           {groups.length > 1 && (
-            <div className="flex overflow-x-auto gap-2 mt-5 pt-4 border-t border-white/10 no-scrollbar">
+            <div className="flex overflow-x-auto gap-1.5 sm:gap-2 pb-1 scrollbar-none">
               <button
                 onClick={() => setSelectedGroupFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                   selectedGroupFilter === 'all'
-                    ? 'bg-emerald-500 text-white shadow-md'
-                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
                 All Committees ({groups.length})
@@ -105,10 +102,10 @@ export const CommitteeModal: React.FC<CommitteeModalProps> = ({
                 <button
                   key={g.id}
                   onClick={() => setSelectedGroupFilter(g.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                     selectedGroupFilter === g.id
-                      ? 'bg-emerald-500 text-white shadow-md'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                   }`}
                 >
                   {g.name} ({g.members?.length || 0})
@@ -116,10 +113,6 @@ export const CommitteeModal: React.FC<CommitteeModalProps> = ({
               ))}
             </div>
           )}
-        </div>
-
-        {/* Content Body */}
-        <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50 space-y-8">
           {groups.length === 0 || totalMembers === 0 ? (
             <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
               <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
@@ -239,8 +232,8 @@ export const CommitteeModal: React.FC<CommitteeModalProps> = ({
         <div className="p-4 sm:p-5 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-slate-400 text-xs">
             <ShieldCheck size={16} className="text-emerald-600" />
-            <span className="font-bold text-slate-600">CricManage Pro</span>
-            <span className="hidden sm:inline">• Official Tournament Management Committee</span>
+            <span className="font-bold text-slate-600">{tournament.name}</span>
+            <span className="hidden sm:inline">• Committee</span>
           </div>
 
           <button

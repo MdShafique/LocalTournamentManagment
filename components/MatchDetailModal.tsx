@@ -161,7 +161,7 @@ export const MatchDetailModal: React.FC<Props> = ({ match, teamA, teamB, onClose
             )}
         </div>
         <div className="px-6 py-3 bg-white border-t border-slate-100 text-center">
-             <p className="text-[7px] font-black text-slate-300 uppercase tracking-[0.5em]">Live Match Analytics • CricManage Pro</p>
+             <p className="text-[7px] font-black text-slate-300 uppercase tracking-[0.5em]">Live Match Analytics </p>
         </div>
       </div>
     </div>

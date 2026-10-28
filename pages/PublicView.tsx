@@ -134,7 +134,7 @@ const TeamMatchesModal = ({ team, matches, teams, stats, onClose }: { team: Team
                     )}
                 </div>
                 <div className="p-6 bg-slate-50 border-t text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
-                    CricManage Pro • Tournament Stats
+                    Tournament Stats
                 </div>
             </div>
         </div>
@@ -143,6 +143,9 @@ const TeamMatchesModal = ({ team, matches, teams, stats, onClose }: { team: Team
 
 export const PublicView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const cachedTourneyName = id ? (localStorage.getItem(`tourney_name_${id}`) || '') : '';
+  const cachedTourneyLogo = id ? (localStorage.getItem(`tourney_logo_${id}`) || '') : '';
+
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -167,6 +170,8 @@ export const PublicView: React.FC = () => {
         return;
       }
       setTournament(t);
+      if (t.name) localStorage.setItem(`tourney_name_${id}`, t.name);
+      if (t.logo) localStorage.setItem(`tourney_logo_${id}`, t.logo);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -378,13 +383,48 @@ export const PublicView: React.FC = () => {
     return null;
   }, [tournament, currentTime]);
 
-  if (error) return <Layout><div className="flex flex-col items-center justify-center pt-20 text-slate-500"><AlertCircle size={48} className="text-red-400 mb-4"/><h2>Oops! {error}</h2></div></Layout>;
-  if (loading || !tournament) return <Layout><div className="flex flex-col items-center justify-center mt-20 gap-3"><Loader2 className="animate-spin text-emerald-600" size={40}/><p className="text-slate-500 uppercase text-[10px] font-black tracking-widest">CricManage Engine...</p></div></Layout>;
+  if (error) return (
+    <Layout>
+      <div className="flex flex-col items-center justify-center pt-20 text-slate-500">
+        <AlertCircle size={48} className="text-red-400 mb-4"/>
+        <h2>Oops! {error}</h2>
+      </div>
+    </Layout>
+  );
+
+  if (loading || !tournament) {
+    const displayTitle = cachedTourneyName || 'Tournament';
+    return (
+      <Layout logo={cachedTourneyLogo} title={displayTitle}>
+        <div className="flex flex-col items-center justify-center mt-20 sm:mt-24 gap-4 text-center px-4 animate-fade-in">
+          {cachedTourneyLogo ? (
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-emerald-500 p-0.5 shadow-md flex items-center justify-center bg-white">
+              <img src={cachedTourneyLogo} alt="Logo" className="w-full h-full object-cover rounded-full" />
+            </div>
+          ) : (
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
+              <Trophy size={30} className="text-yellow-500" />
+            </div>
+          )}
+          <Loader2 className="animate-spin text-emerald-600" size={36}/>
+          <div>
+            <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight">
+              {displayTitle}
+            </h2>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">
+              লোড হচ্ছে, অপেক্ষা করুন...
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const isRegOpen = tournament.isRegistrationOpen !== false && regTimer?.status !== 'ended' && regTimer?.status !== 'upcoming';
 
   return (
     <Layout 
+      logo={tournament.logo}
       title={tournament.name}
       rightAction={
         <div className="flex items-center gap-2">

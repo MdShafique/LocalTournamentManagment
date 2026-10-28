@@ -43,28 +43,28 @@ export const SponsoredAdTicker: React.FC<SponsoredAdTickerProps> = ({ config }) 
       return {
         bg: 'bg-gradient-to-r from-rose-500 to-red-600 text-white',
         counterBg: 'bg-black/20 text-white',
-        icon: <Megaphone size={13} className="text-white shrink-0 animate-pulse" />
+        icon: <Megaphone className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white shrink-0 animate-pulse" />
       };
     }
     if (lower.includes('info') || lower.includes('তথ্য') || lower.includes('ট্যুরনামেন্ট')) {
       return {
         bg: 'bg-gradient-to-r from-sky-400 to-blue-500 text-slate-950',
         counterBg: 'bg-slate-950/20 text-slate-950',
-        icon: <Info size={13} className="text-slate-950 shrink-0" />
+        icon: <Info className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-slate-950 shrink-0" />
       };
     }
     if (lower.includes('update') || lower.includes('আপডেট')) {
       return {
         bg: 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950',
         counterBg: 'bg-slate-950/20 text-slate-950',
-        icon: <Sparkles size={13} className="text-slate-950 shrink-0" />
+        icon: <Sparkles className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-slate-950 shrink-0" />
       };
     }
     // Default Sponsor Style
     return {
       bg: 'bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950',
       counterBg: 'bg-slate-950/20 text-slate-950',
-      icon: <Sparkles size={13} className="text-slate-950 animate-pulse shrink-0" />
+      icon: <Sparkles className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-slate-950 animate-pulse shrink-0" />
     };
   };
 
@@ -88,7 +88,7 @@ export const SponsoredAdTicker: React.FC<SponsoredAdTickerProps> = ({ config }) 
 
   return (
     <div 
-      className="mb-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-amber-500/40 text-white shadow-lg overflow-hidden relative flex items-center p-2 sm:p-2.5 group"
+      className="mb-4 sm:mb-6 rounded-xl sm:rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-amber-500/40 text-white shadow-lg overflow-hidden relative flex items-center p-1.5 sm:p-2.5 group"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={() => setIsPaused(true)}
@@ -105,12 +105,14 @@ export const SponsoredAdTicker: React.FC<SponsoredAdTickerProps> = ({ config }) 
         }
       `}</style>
 
-      {/* Left Badge: Configurable Button/Tag (Sponsor / Info / Notice etc.) */}
-      <div className={`z-10 shrink-0 ${badgeStyle.bg} font-black text-[10px] sm:text-xs uppercase px-2.5 sm:px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 mr-2 sm:mr-3 select-none transition-all duration-300`}>
+      {/* Left Badge: Configurable Button/Tag (Compact on Mobile to leave max room for running text) */}
+      <div className={`z-10 shrink-0 ${badgeStyle.bg} font-black text-[9px] sm:text-xs uppercase px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl shadow-md flex items-center gap-1 sm:gap-1.5 mr-1.5 sm:mr-3 select-none transition-all duration-300`}>
         {badgeStyle.icon}
-        <span className="tracking-wider">{badgeLabel}</span>
+        <span className="tracking-tight sm:tracking-wider max-w-[80px] sm:max-w-none truncate sm:overflow-visible">
+          {badgeLabel}
+        </span>
         {items.length > 1 && (
-          <span className={`${badgeStyle.counterBg} px-1.5 py-0.2 rounded text-[9px] font-mono`}>
+          <span className={`hidden sm:inline-block ${badgeStyle.counterBg} px-1.5 py-0.2 rounded text-[9px] font-mono`}>
             {currentIndex + 1}/{items.length}
           </span>
         )}

@@ -35,6 +35,8 @@ import { uploadImageToCloudinary } from '../services/cloudinaryService';
 export const TournamentAdmin: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const cachedTourneyName = id ? (localStorage.getItem(`tourney_name_${id}`) || '') : '';
+  const cachedTourneyLogo = id ? (localStorage.getItem(`tourney_logo_${id}`) || '') : '';
   
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [teams, setTeams] = useState<Team[]>([]);
@@ -122,6 +124,8 @@ export const TournamentAdmin: React.FC = () => {
         const m = await getMatches(id);
         const regs = await getRegistrations(id);
         setTournament(t);
+        if (t.name) localStorage.setItem(`tourney_name_${id}`, t.name);
+        if (t.logo) localStorage.setItem(`tourney_logo_${id}`, t.logo);
         setTeams(tm);
         setMatches(m);
         setRegistrations(regs);
@@ -637,23 +641,35 @@ export const TournamentAdmin: React.FC = () => {
     printWindow.document.close();
   };
 
-  if (isLoading) return <Layout><div className="flex justify-center mt-20"><Loader2 className="animate-spin text-emerald-600" size={40}/></div></Layout>;
+  if (isLoading) return (
+    <Layout logo={cachedTourneyLogo} title={cachedTourneyName}>
+      <div className="flex flex-col items-center justify-center mt-20 sm:mt-24 gap-3 text-center px-4 animate-fade-in">
+        <Loader2 className="animate-spin text-emerald-600" size={36}/>
+        <h2 className="text-base sm:text-xl font-black text-slate-800">
+          {cachedTourneyName || 'Tournament Dashboard'}
+        </h2>
+        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+          লোড হচ্ছে...
+        </p>
+      </div>
+    </Layout>
+  );
   if (permissionDenied) return <Layout><div className="text-center pt-20"><Lock size={64} className="mx-auto mb-4 text-red-300"/><h1 className="text-2xl font-bold">Access Denied</h1><p className="text-slate-500 mt-2">You must be the admin to manage this tournament.</p><button onClick={() => navigate('/admin')} className="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold">Admin Portal</button></div></Layout>;
   if (!tournament) return <Layout><div className="text-center pt-20">Tournament not found.</div></Layout>;
 
   return (
-    <Layout>
+    <Layout logo={tournament?.logo} title={tournament?.name}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
            <button onClick={() => navigate('/admin')} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm mb-2"><ArrowLeft size={16}/> Back</button>
            <div className="flex items-center gap-3">
-               {tournament.logo && <img src={tournament.logo} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm" alt="logo"/>}
-               <div>
-                 <div className="flex items-center gap-2">
-                   <h1 className="text-2xl font-bold text-slate-900">{tournament.name}</h1>
+               {tournament.logo && <img src={tournament.logo} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm shrink-0" alt="logo"/>}
+               <div className="min-w-0">
+                 <div className="flex items-center gap-2 flex-wrap">
+                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate">{tournament.name}</h1>
                    <button 
                      onClick={() => { setIsEditingTournament(true); setEditSettingsTab('info'); }} 
-                     className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                     className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors shrink-0"
                      title="Edit Tournament Settings"
                    ><Settings size={16}/></button>
                  </div>
@@ -688,19 +704,19 @@ export const TournamentAdmin: React.FC = () => {
                </div>
            </div>
         </div>
-        <button onClick={() => { const url = `${window.location.origin}/#/view/${tournament.id}`; navigator.clipboard.writeText(url); alert('URL copied!'); }} className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg font-bold border border-emerald-100"><Share2 size={18} /> Share Link</button>
+        <button onClick={() => { const url = `${window.location.origin}/#/view/${tournament.id}`; navigator.clipboard.writeText(url); alert('URL copied!'); }} className="w-full sm:w-auto justify-center flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2.5 rounded-xl font-bold border border-emerald-100 shadow-xs"><Share2 size={18} /> Share Link</button>
       </div>
 
       {/* ============ TOURNAMENT SETTINGS MODAL ============ */}
       {isEditingTournament && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[90] p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl border border-slate-100 my-8">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[90] p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-3xl border border-slate-100 my-4 sm:my-8 overflow-hidden">
             
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6 rounded-t-3xl flex items-center justify-between">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 sm:p-6 rounded-t-2xl sm:rounded-t-3xl flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-white">Tournament Settings</h2>
-                <p className="text-xs text-slate-300">{tournament.name}</p>
+                <h2 className="text-base sm:text-lg font-black text-white">Tournament Settings</h2>
+                <p className="text-xs text-slate-300 truncate max-w-[200px] sm:max-w-md">{tournament.name}</p>
               </div>
               <button onClick={() => { setIsEditingTournament(false); refreshData(); }} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white">
                 <X size={20} />
@@ -708,7 +724,7 @@ export const TournamentAdmin: React.FC = () => {
             </div>
 
             {/* Settings Tabs */}
-            <div className="flex gap-1 p-2 bg-slate-100 m-4 mb-0 rounded-xl text-xs font-bold">
+            <div className="flex gap-1.5 p-2 bg-slate-100 m-3 sm:m-4 mb-0 rounded-xl text-xs font-bold overflow-x-auto whitespace-nowrap scrollbar-none">
               {[
                 { id: 'info', label: '📋 Basic Info', },
                 { id: 'rules', label: '📜 Rules & ToS', },
@@ -719,7 +735,7 @@ export const TournamentAdmin: React.FC = () => {
                 <button
                   key={t.id}
                   onClick={() => setEditSettingsTab(t.id as any)}
-                  className={`flex-1 py-2 px-3 rounded-lg transition-all ${
+                  className={`py-2 px-3 rounded-lg transition-all shrink-0 ${
                     editSettingsTab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
@@ -2298,7 +2314,7 @@ export const TournamentAdmin: React.FC = () => {
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-slate-200">
+      <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-slate-200 scrollbar-none">
           {[
             { id: 'overview', label: 'Overview' },
             { id: 'teams', label: 'Teams' },
@@ -2309,7 +2325,7 @@ export const TournamentAdmin: React.FC = () => {
               <button 
                 key={tab.id} 
                 onClick={() => { setView(tab.id as any); setActiveMatch(null); setSelectedTeamForSquad(null); }} 
-                className={`px-4 py-2 rounded-lg font-medium capitalize flex items-center gap-2 transition-colors ${
+                className={`px-4 py-2 rounded-lg font-medium capitalize flex items-center gap-2 transition-colors shrink-0 whitespace-nowrap ${
                   view === tab.id && !activeMatch && !selectedTeamForSquad 
                     ? 'bg-slate-900 text-white shadow-sm' 
                     : 'bg-white text-slate-600 hover:bg-slate-100'
