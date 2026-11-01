@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { getTeams, getTournament, subscribeToMatches, subscribeToTournament } from '../services/storageService';
+import { getTeams, getTournament, subscribeToMatches, subscribeToTournament, subscribeToRegistrations } from '../services/storageService';
 import { calculateTable } from '../utils/statsHelper';
-import { Match, Team, Tournament, TableRow, MatchStatus, Player } from '../types';
+import { Match, Team, Tournament, TableRow, MatchStatus, Player, PlayerRegistration } from '../types';
 import { MatchCard } from '../components/MatchCard';
 import { LiveDetailedCard } from '../components/LiveDetailedCard';
 import { MatchDetailModal } from '../components/MatchDetailModal';
 import { PlayerDetailModal } from '../components/PlayerDetailModal';
-import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap, X, CheckCircle2, XCircle, MinusCircle, UserPlus, Clock, Timer, Users, Building2 } from 'lucide-react';
+import { Trophy, Activity, BarChart3, Shield, Loader2, AlertCircle, Layers, Star, User, Calendar, ChevronRight, Award, Coffee, Zap, X, CheckCircle2, XCircle, MinusCircle, UserPlus, Clock, Timer, Users, Building2, ChevronDown, Download } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { PlayerRegistrationModal } from '../components/PlayerRegistrationModal';
 import { CommitteeModal } from '../components/CommitteeModal';
 import { SponsoredAdTicker } from '../components/SponsoredAdTicker';
+import { PublicRegistrationsModal } from '../components/PublicRegistrationsModal';
 
 interface TopBatsman {
   id: string;
@@ -159,6 +160,20 @@ export const PublicView: React.FC = () => {
   const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<Team | null>(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [showCommitteeModal, setShowCommitteeModal] = useState(false);
+
+  // Registrations state for public directory
+  const [registrations, setRegistrations] = useState<PlayerRegistration[]>([]);
+  const [showPublicRegModal, setShowPublicRegModal] = useState(false);
+  const [publicRegInitialFilter, setPublicRegInitialFilter] = useState<'all' | 'pending' | 'approved'>('all');
+
+  // Real-time registrations listener
+  useEffect(() => {
+    if (!id) return;
+    const unsubscribe = subscribeToRegistrations(id, (regs) => {
+      setRegistrations(regs || []);
+    });
+    return () => unsubscribe();
+  }, [id]);
 
   // Real-time Tournament subscription (sponsored ads, committee, registration status, timer etc.)
   useEffect(() => {
@@ -510,6 +525,117 @@ export const PublicView: React.FC = () => {
               Registration Closed
             </div>
           )}
+        </div>
+      )}
+
+      {/* Registration Stats Summary Card (All, Pending, Approved) */}
+      {tournament.isRegistrationOpen !== false && (
+        <div className="mb-6 bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg">
+                <Users size={16} />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 uppercase tracking-wider">
+                  Player Registration Summary
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  নিচের বাটনে ক্লিক করে খেলোয়াড়দের তালিকা ও ফরম ডাউনলোড করুন
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPublicRegInitialFilter('all');
+                setShowPublicRegModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition border border-emerald-200/60 self-start sm:self-auto"
+            >
+              <span>View All Directory</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* 3 Metric Buttons: All, Pending, Approved */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3.5 pt-3">
+            {/* All Registered */}
+            <button
+              type="button"
+              onClick={() => {
+                setPublicRegInitialFilter('all');
+                setShowPublicRegModal(true);
+              }}
+              className="bg-gradient-to-br from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl shadow-xs transition-all active:scale-95 text-left flex flex-col justify-between group cursor-pointer border border-slate-700"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">
+                  All Register
+                </span>
+                <Users size={13} className="text-yellow-400 group-hover:scale-110 transition shrink-0" />
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-lg sm:text-2xl font-black font-mono text-white">
+                  {registrations.length}
+                </span>
+                <span className="text-[9px] sm:text-[11px] font-bold text-yellow-300/90 underline group-hover:text-yellow-200 hidden xs:inline">
+                  View List
+                </span>
+              </div>
+            </button>
+
+            {/* Approved Registered */}
+            <button
+              type="button"
+              onClick={() => {
+                setPublicRegInitialFilter('approved');
+                setShowPublicRegModal(true);
+              }}
+              className="bg-gradient-to-br from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-white p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl shadow-xs transition-all active:scale-95 text-left flex flex-col justify-between group cursor-pointer border border-emerald-600/40"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-emerald-200">
+                  Approved
+                </span>
+                <CheckCircle2 size={13} className="text-emerald-300 group-hover:scale-110 transition shrink-0" />
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-lg sm:text-2xl font-black font-mono text-white">
+                  {registrations.filter(r => r.status === 'approved').length}
+                </span>
+                <span className="text-[9px] sm:text-[11px] font-bold text-emerald-200 underline group-hover:text-white hidden xs:inline">
+                  Verified
+                </span>
+              </div>
+            </button>
+
+            {/* Pending Registered */}
+            <button
+              type="button"
+              onClick={() => {
+                setPublicRegInitialFilter('pending');
+                setShowPublicRegModal(true);
+              }}
+              className="bg-gradient-to-br from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-white p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl shadow-xs transition-all active:scale-95 text-left flex flex-col justify-between group cursor-pointer border border-amber-500/40"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-amber-100">
+                  Pending
+                </span>
+                <Clock size={13} className="text-amber-200 group-hover:scale-110 transition shrink-0" />
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-lg sm:text-2xl font-black font-mono text-white">
+                  {registrations.filter(r => r.status === 'pending').length}
+                </span>
+                <span className="text-[9px] sm:text-[11px] font-bold text-amber-200 underline group-hover:text-white hidden xs:inline">
+                  Review
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
       )}
       {/* Pill Style Navigation */}
@@ -881,6 +1007,16 @@ export const PublicView: React.FC = () => {
             tournament={tournament}
             isOpen={showCommitteeModal}
             onClose={() => setShowCommitteeModal(false)}
+          />
+      )}
+
+      {tournament && (
+          <PublicRegistrationsModal 
+            isOpen={showPublicRegModal}
+            onClose={() => setShowPublicRegModal(false)}
+            tournament={tournament}
+            registrations={registrations}
+            initialFilter={publicRegInitialFilter}
           />
       )}
     </Layout>
