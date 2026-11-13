@@ -18,7 +18,7 @@ import {
   deleteRegistration,
   assignPlayerToTeam
 } from '../services/storageService';
-import { Match, Team, Tournament, Player, StageType, MatchStatus, PlayerRegistration, CommitteeGroup, CommitteeMember, SponsoredAdItem, SponsoredAdsConfig } from '../types';
+import { Match, Team, Tournament, Player, StageType, MatchStatus, PlayerRegistration, CommitteeGroup, CommitteeMember, SponsoredAdItem, SponsoredAdsConfig, SeasonItem, SeasonConfig } from '../types';
 import { printRegistrationSlip } from '../utils/printHelper';
 import { Layout } from '../components/Layout';
 import { AdminMatchControl } from '../components/AdminMatchControl';
@@ -70,7 +70,7 @@ export const TournamentAdmin: React.FC = () => {
   const [uploadingEditPlayerImage, setUploadingEditPlayerImage] = useState(false);
 
   const [isEditingTournament, setIsEditingTournament] = useState(false);
-  const [editSettingsTab, setEditSettingsTab] = useState<'info' | 'rules' | 'payment' | 'committee' | 'ads'>('info');
+  const [editSettingsTab, setEditSettingsTab] = useState<'info' | 'rules' | 'payment' | 'committee' | 'ads' | 'seasons'>('info');
   const [newGroupName, setNewGroupName] = useState('');
   const [addingMemberToGroupId, setAddingMemberToGroupId] = useState<string | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
@@ -99,6 +99,12 @@ export const TournamentAdmin: React.FC = () => {
   const [uploadingAdLogo, setUploadingAdLogo] = useState(false);
   const [editingAdItem, setEditingAdItem] = useState<SponsoredAdItem | null>(null);
   const [uploadingEditAdLogo, setUploadingEditAdLogo] = useState(false);
+
+  // Seasons states
+  const [newSeasonTitle, setNewSeasonTitle] = useState('');
+  const [newSeasonLink, setNewSeasonLink] = useState('');
+  const [newSeasonYear, setNewSeasonYear] = useState('');
+  const [editingSeasonItem, setEditingSeasonItem] = useState<SeasonItem | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -505,6 +511,7 @@ export const TournamentAdmin: React.FC = () => {
                 { id: 'payment', label: '💳 Payment Gateways', },
                 { id: 'committee', label: '🏛️ Committee', },
                 { id: 'ads', label: '📢 Sponsored Ads', },
+                { id: 'seasons', label: '🗓️ Seasons', },
               ].map(t => (
                 <button
                   key={t.id}
@@ -1707,7 +1714,373 @@ export const TournamentAdmin: React.FC = () => {
                   </div>
                 )}
 
+              
+                {/* ---- TAB: SEASONS ---- */}
+                {editSettingsTab === 'seasons' && (
+                  <div className="space-y-6">
+                    {/* Enable/Disable Toggle */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-sm text-slate-800">Season Switcher Dropdown (পূর্ববর্তী সিজন ড্রপডাউন)</p>
+                        <p className="text-xs text-slate-500">
+                          {tournament.seasons?.enabled !== false 
+                            ? '🟢 চালু আছে — ফ্রন্টএন্ড নেভবারে "Season" বাটন ও ড্রপডাউন দেখা যাবে' 
+                            : '🔴 বন্ধ আছে — সিজন ড্রপডাউন বন্ধ থাকবে'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTournament(prev => prev ? {
+                          ...prev,
+                          seasons: {
+                            ...(prev.seasons || { items: [] }),
+                            enabled: prev.seasons?.enabled === false ? true : false
+                          }
+                        } : prev)}
+                        className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                          tournament.seasons?.enabled !== false ? 'bg-emerald-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition duration-200 ${
+                          tournament.seasons?.enabled !== false ? 'translate-x-7' : 'translate-x-0'
+                        }`}/>
+                      </button>
+                    </div>
+
+                    {/* Season Button Label */}
+                    <div className="p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        নেভবার বাটন টেক্সট (Button Label)
+                      </label>
+                      <input
+                        type="text"
+                        value={tournament.seasons?.buttonLabel ?? 'Season'}
+                        onChange={(e) => setTournament(prev => prev ? {
+                          ...prev,
+                          seasons: {
+                            ...(prev.seasons || { items: [] }),
+                            buttonLabel: e.target.value
+                          }
+                        } : prev)}
+                        placeholder="e.g. Season / সিজন"
+                        className="w-full border border-emerald-300 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        ফ্রন্টএন্ড নেভবারে "About Committee"-এর পূর্বে এই বাটনটি প্রদর্শিত হবে।
+                      </p>
+                    </div>
+
+                    {/* Add New Season Form */}
+                    <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-2xl space-y-3">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                        <Plus size={15}/> নতুন সিজন যোগ করুন (Add New Season)
+                      </h4>
+
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                              সিজনের নাম / শিরোনাম (Season Title) *
+                            </label>
+                            <input
+                              type="text"
+                              value={newSeasonTitle}
+                              onChange={(e) => setNewSeasonTitle(e.target.value)}
+                              placeholder="e.g. Season 1 (2024), BPL Season 2"
+                              className="w-full border border-blue-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                              সাল / বছর (Year - ঐচ্ছিক)
+                            </label>
+                            <input
+                              type="text"
+                              value={newSeasonYear}
+                              onChange={(e) => setNewSeasonYear(e.target.value)}
+                              placeholder="e.g. 2024, 2025"
+                              className="w-full border border-blue-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                            টুর্নামেন্টের লিংক বা ID (Tournament Link or ID) *
+                          </label>
+                          <input
+                            type="text"
+                            value={newSeasonLink}
+                            onChange={(e) => setNewSeasonLink(e.target.value)}
+                            placeholder="e.g. 1740000000 বা /#/view/1740000000 বা পূর্ণ লিংক https://..."
+                            className="w-full border border-blue-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            💡 ড্রপডাউনে এই সিজনে ক্লিক করলে দর্শক সরাসরি ওই টুর্নামেন্টে চলে যাবে। শুধু Tournament ID বা পুরো লিংক যেকোনোটি দিতে পারেন।
+                          </p>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newSeasonTitle.trim()) {
+                                alert('দয়া করে সিজনের নাম লিখুন');
+                                return;
+                              }
+                              if (!newSeasonLink.trim()) {
+                                alert('দয়া করে টুর্নামেন্টের লিংক বা ID দিন');
+                                return;
+                              }
+                              const newSeason: SeasonItem = {
+                                id: 'season_' + Date.now().toString(),
+                                title: newSeasonTitle.trim(),
+                                link: newSeasonLink.trim(),
+                                year: newSeasonYear.trim() || undefined
+                              };
+                              setTournament(prev => prev ? {
+                                ...prev,
+                                seasons: {
+                                  ...(prev.seasons || { items: [] }),
+                                  items: [...(prev.seasons?.items || []), newSeason]
+                                }
+                              } : prev);
+                              setNewSeasonTitle('');
+                              setNewSeasonLink('');
+                              setNewSeasonYear('');
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition"
+                          >
+                            <Plus size={15} /> Add Season to List
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seasons List */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-slate-700">
+                          তালিকায় থাকা সিজনসমূহ (Season List)
+                        </h4>
+                        <span className="text-[11px] text-slate-400">
+                          {tournament.seasons?.items?.length || 0} টি সিজন ড্রপডাউনে প্রদর্শিত হবে
+                        </span>
+                      </div>
+
+                      {(!tournament.seasons?.items || tournament.seasons.items.length === 0) ? (
+                        <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 text-slate-400 text-xs">
+                          এখনো কোনো পূর্ববর্তী বা পরবর্তী সিজন যুক্ত করা হয়নি।
+                        </div>
+                      ) : (
+                        tournament.seasons.items.map((season, idx) => (
+                          <div key={season.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 font-mono font-bold text-xs flex items-center justify-center shrink-0">
+                                #{idx + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-extrabold text-slate-900 truncate">{season.title}</p>
+                                  {season.year && (
+                                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
+                                      {season.year}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] font-mono text-blue-500 truncate">{season.link}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Move Up */}
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const items = [...(tournament.seasons?.items || [])];
+                                    const temp = items[idx - 1];
+                                    items[idx - 1] = items[idx];
+                                    items[idx] = temp;
+                                    setTournament(prev => prev ? {
+                                      ...prev,
+                                      seasons: {
+                                        ...(prev.seasons || { items: [] }),
+                                        items
+                                      }
+                                    } : prev);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-700 rounded font-bold"
+                                  title="Move Up"
+                                >
+                                  ↑
+                                </button>
+                              )}
+                              {/* Move Down */}
+                              {idx < (tournament.seasons?.items?.length || 0) - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const items = [...(tournament.seasons?.items || [])];
+                                    const temp = items[idx + 1];
+                                    items[idx + 1] = items[idx];
+                                    items[idx] = temp;
+                                    setTournament(prev => prev ? {
+                                      ...prev,
+                                      seasons: {
+                                        ...(prev.seasons || { items: [] }),
+                                        items
+                                      }
+                                    } : prev);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-700 rounded font-bold"
+                                  title="Move Down"
+                                >
+                                  ↓
+                                </button>
+                              )}
+                              {/* Edit Season */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSeasonItem({ ...season });
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                title="Edit Season"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              {/* Delete Season */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTournament(prev => prev ? {
+                                    ...prev,
+                                    seasons: {
+                                      ...(prev.seasons || { items: [] }),
+                                      items: (prev.seasons?.items || []).filter(item => item.id !== season.id)
+                                    }
+                                  } : prev);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                title="Delete Season"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
               </form>
+
+              
+              {/* Edit Season Modal */}
+              {editingSeasonItem && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[105] p-4 animate-fade-in">
+                  <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden animate-fade-in-up">
+                    <div className="bg-gradient-to-r from-emerald-800 to-slate-900 p-4 text-white flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Edit2 size={16} className="text-emerald-300" />
+                        <h4 className="font-bold text-sm">সিজন সম্পাদনা (Edit Season)</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSeasonItem(null)}
+                        className="p-1 hover:bg-white/20 rounded-full text-white/80 hover:text-white"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="p-5 space-y-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                            সিজনের নাম / শিরোনাম (Season Title) *
+                          </label>
+                          <input
+                            type="text"
+                            value={editingSeasonItem.title}
+                            onChange={(e) => setEditingSeasonItem(prev => prev ? {...prev, title: e.target.value} : null)}
+                            placeholder="e.g. Season 1 (2024)"
+                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                            সাল / বছর (Year)
+                          </label>
+                          <input
+                            type="text"
+                            value={editingSeasonItem.year || ''}
+                            onChange={(e) => setEditingSeasonItem(prev => prev ? {...prev, year: e.target.value} : null)}
+                            placeholder="e.g. 2024"
+                            className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          টুর্নামেন্টের লিংক বা ID (Link or Tournament ID) *
+                        </label>
+                        <input
+                          type="text"
+                          value={editingSeasonItem.link}
+                          onChange={(e) => setEditingSeasonItem(prev => prev ? {...prev, link: e.target.value} : null)}
+                          placeholder="e.g. 1740000000 বা /#/view/1740000000"
+                          className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setEditingSeasonItem(null)}
+                          className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!editingSeasonItem.title.trim()) {
+                              alert('দয়া করে সিজনের নাম লিখুন');
+                              return;
+                            }
+                            if (!editingSeasonItem.link.trim()) {
+                              alert('দয়া করে লিংক দিন');
+                              return;
+                            }
+                            setTournament(prev => prev ? {
+                              ...prev,
+                              seasons: {
+                                ...(prev.seasons || { items: [] }),
+                                items: (prev.seasons?.items || []).map(s => s.id === editingSeasonItem.id ? {
+                                  ...s,
+                                  title: editingSeasonItem.title.trim(),
+                                  link: editingSeasonItem.link.trim(),
+                                  year: editingSeasonItem.year?.trim() || undefined
+                                } : s)
+                              }
+                            } : prev);
+                            setEditingSeasonItem(null);
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5"
+                        >
+                          <Check size={14} /> Update Season
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Edit Ad Modal */}
               {editingAdItem && (

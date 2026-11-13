@@ -13,6 +13,7 @@ import { PlayerRegistrationModal } from '../components/PlayerRegistrationModal';
 import { CommitteeModal } from '../components/CommitteeModal';
 import { SponsoredAdTicker } from '../components/SponsoredAdTicker';
 import { PublicRegistrationsModal } from '../components/PublicRegistrationsModal';
+import { SeasonDropdown } from '../components/SeasonDropdown';
 
 interface TopBatsman {
   id: string;
@@ -442,15 +443,21 @@ export const PublicView: React.FC = () => {
       logo={tournament.logo}
       title={tournament.name}
       rightAction={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Season Dropdown (Placed before About Committee) */}
+          {tournament.seasons && tournament.seasons.enabled !== false && tournament.seasons.items && tournament.seasons.items.length > 0 && (
+            <SeasonDropdown config={tournament.seasons} currentTournamentId={tournament.id} />
+          )}
+
           {tournament.isCommitteeVisible && (
             <button
               onClick={() => setShowCommitteeModal(true)}
-              className="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 hover:text-white font-extrabold px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow transition-all active:scale-95 border border-emerald-600 shrink-0"
+              className="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 hover:text-white font-extrabold px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 shadow transition-all active:scale-95 border border-emerald-600 shrink-0"
               title="About Committee"
             >
-              <Users size={16} className="shrink-0 text-emerald-300" />
-              <span>About Committee</span>
+              <Users size={15} className="shrink-0 text-emerald-300" />
+              <span className="hidden xs:inline">About Committee</span>
+              <span className="xs:hidden">Committee</span>
             </button>
           )}
 
@@ -467,11 +474,11 @@ export const PublicView: React.FC = () => {
                 regTimer?.status === 'upcoming' 
                   ? 'bg-slate-200 text-slate-600 hover:bg-slate-300 border-slate-300' 
                   : 'bg-yellow-400 hover:bg-yellow-300 text-slate-900 border-yellow-300'
-              } font-extrabold px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow transition-all active:scale-95 border shrink-0`}
+              } font-extrabold px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 shadow transition-all active:scale-95 border shrink-0`}
               title="Register as a Player"
             >
-              <UserPlus size={16} className="shrink-0" />
-              <span>{regTimer?.status === 'upcoming' ? 'Registration Upcoming' : 'Registration'}</span>
+              <UserPlus size={15} className="shrink-0" />
+              <span>{regTimer?.status === 'upcoming' ? 'Upcoming' : 'Register'}</span>
             </button>
           ) : undefined}
         </div>

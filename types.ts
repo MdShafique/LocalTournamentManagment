@@ -164,6 +164,20 @@ export interface PaymentGatewayConfig {
   enabledMethods?: PaymentMethod[];
 }
 
+export interface SeasonItem {
+  id: string;
+  title: string;       // e.g. "Season 1 (2024)", "BPL 2025"
+  link: string;        // URL or tournament view link, e.g. "/#/view/12345" or full URL
+  year?: string;       // e.g. "2024" (optional)
+  isCurrent?: boolean; // highlight current season
+}
+
+export interface SeasonConfig {
+  enabled?: boolean;
+  buttonLabel?: string; // Default: "Season"
+  items: SeasonItem[];
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -181,6 +195,7 @@ export interface Tournament {
   isCommitteeVisible?: boolean;
   committee?: CommitteeConfig;
   sponsoredAds?: SponsoredAdsConfig;
+  seasons?: SeasonConfig;
   seriesAwards?: {
       playerOfSeries?: string;
       bestBatsman?: string;
